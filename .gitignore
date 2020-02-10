@@ -1,0 +1,11 @@
+*.xml
+*.log
+*.apk
+*.iml
+**/.vscode/
+**/.idea/
+*.pyc
+.DS_Store
+*.cfg
+*.png
+*.sqlite3
