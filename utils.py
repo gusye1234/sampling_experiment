@@ -47,7 +47,10 @@ class ELBO(nn.Module):
         return a*torch.log(b) + (1-a)*torch.log(1-b) 
         
 
-def SampleByGamma():
+# TODO
+# def SampleByGamma():
+#     pass
+
 
 
 if __name__ == "__main__":
