@@ -5,6 +5,7 @@ class RecMF(nn.Module):
     """
     create embeddings for recommendation
     input user-item pair to get the rating.
+    embedding normally initialized N(0,1)
     """
     def __init__(self, config):
         super(RecMF, self).__init__()
@@ -23,8 +24,8 @@ class RecMF(nn.Module):
         except AssertionError:
             raise AssertionError(f"(Rec)users and items should be paired, \
                                  but we got {len(users)} users and {len(items)} items")
-        users_emb = self.embedding_user(users)
-        items_emb = self.embedding_item(items)
+        users_emb = self.embedding_user(users.long())
+        items_emb = self.embedding_item(items.long())
         inner_pro = torch.mul(users_emb, items_emb)
         rating    = self.f(torch.sum(inner_pro, dim=1))
         return rating
@@ -34,6 +35,7 @@ class VarMF(nn.Module):
     """
     create embeddings for variational inference
     input user-item pair to get the Probability.
+    embedding normally initialized N(0,1)
     """
     def __init__(self, config):
         super(VarMF, self).__init__()
