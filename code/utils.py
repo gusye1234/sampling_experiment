@@ -15,6 +15,7 @@ class ELBO:
         gamma  : shape(batch_size, 1)
         xij    : shape(batch_size, 1)
     """
+    eps = torch.Tensor([1e-8]).float()
     def __init__(self, config,
                  rec_model, var_model, rec_lr=0.05, var_lr=0.05):
         rec_model : nn.Module
@@ -36,22 +37,31 @@ class ELBO:
         rating : torch.Tensor
         gamma  : torch.Tensor
         xij    : torch.Tensor
-        
+                
         try:
             assert rating.size() == gamma.size() == xij.size()
             assert len(rating.size()) == 1
         except ValueError:
             print("input error!")
             print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
-         
-        same_term   = log(( 1-self.eta)/gamma )
-        part_one    = xij*log( rating/self.epsilon ) \
-                        + (1-xij)*log( (1-rating)/(1-self.epsilon) ) \
+        gamma = gamma + self.eps
+        same_term   = log(( 1-self.eta + self.eps)/gamma )
+        part_one    = xij*log( (rating + self.eps)/self.epsilon ) \
+                        + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
                         + log(self.eta/gamma) \
                         - same_term
         part_two    = (self.cross(xij, self.epsilon) + same_term)/gamma
-        assert len(part_one) == len(part_two)
-        loss: torch.Tensor = torch.neg(torch.sum(part_one + part_two))
+
+        loss1       = torch.sum(part_one)
+        loss2       = torch.sum(part_two)
+        # print(loss1, loss2)
+        # print(gamma)
+        # print(torch.sum(self.cross(gamma, gamma)/gamma))
+        loss: torch.Tensor = -(loss1+loss2)
+        if torch.isnan(loss) or torch.isinf(loss):
+            print("loss1:", loss1)
+            print("loss2:", loss2)
+            raise ValueError("nan or inf")
         cri = loss.data
         
         self.optForvar.zero_grad()
@@ -80,7 +90,7 @@ class ELBO:
     def cross(a, b):
         a : torch.Tensor
         b : torch.Tensor
-        return a*torch.log(b) + (1-a)*torch.log(1-b) 
+        return a*torch.log(b + ELBO.eps) + (1-a)*torch.log(1-b + ELBO.eps) 
         
 # =========================================
 # TODO
@@ -95,11 +105,13 @@ def UniformSample(users, dataset, k=1):
     """
     dataset : BasicDataset
     allPos   = dataset.getUserPosItems(users)
+    allNeg   = dataset.getUserNegItems(users)
     allItems = list(range(dataset.m_items))
     S = []
     for i, user in enumerate(users):
         posForUser = allPos[i]
-        negForUser = dataset.getUserNegItems([user])[0]
+        # negForUser = dataset.getUserNegItems([user])[0]
+        negForUser = allNeg[i]
         onePos     = np.random.choice(posForUser, size=(1, ))
         kNeg       = np.random.choice(negForUser, size=(k, ))
         S.append(np.hstack([onePos, kNeg]))

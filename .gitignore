@@ -9,3 +9,5 @@
 *.cfg
 *.png
 *.sqlite3
+samwalker/
+**/output

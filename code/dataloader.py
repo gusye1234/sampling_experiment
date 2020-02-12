@@ -53,17 +53,19 @@ class LastFM(BasicDataset):
         print(f"LastFm Sparsity : {(len(self.trainUser) + len(self.testUser))/self.n_users/self.m_items}")
         
         # (users,users)
-        self.socialNet    = csr_matrix((np.ones(len(trustNet)), (trustNet[:,0], trustNet[:,1])), shape=(self.n_users,self.n_users))
+        self.socialNet    = csr_matrix((np.ones(len(trustNet)), (trustNet[:,0], trustNet[:,1]) ), shape=(self.n_users,self.n_users))
         # (users,items), bipartite graph
-        self.UserItemNet  = csr_matrix((np.ones(len(self.trainUser)), (self.trainUser, self.trainItem)), shape=(self.n_users,self.m_items)) 
+        self.UserItemNet  = csr_matrix((np.ones(len(self.trainUser)), (self.trainUser, self.trainItem) ), shape=(self.n_users,self.m_items)) 
         
         # pre-calculate
         self.allPos = self.getUserPosItems(list(range(self.n_users)))
         self.allNeg = []
+        allItems    = set(range(self.m_items))
         for i in range(self.n_users):
             pos = set(self.allPos[i])
-            neg = set(range(self.m_items)) - pos
+            neg = allItems - pos
             self.allNeg.append(list(neg))
+
     
     def getUserItemFeedback(self, users, items):
         """
@@ -74,6 +76,7 @@ class LastFM(BasicDataset):
         return:
             feedback [-1]
         """
+        # print(self.UserItemNet[users, items])
         return np.array(self.UserItemNet[users, items]).astype('uint8').reshape(-1)
     
     def getUserPosItems(self, users):
@@ -93,7 +96,7 @@ class LastFM(BasicDataset):
     def __getitem__(self, index):
         if self.mode == 0:
             user = self.trainUser[index]
-        if self.mode == 1:
+        elif self.mode == 1:
             user = self.testUser[index]
         # return user_id and the positive items of the user
         return user
