@@ -26,7 +26,7 @@ class ELBO:
         self.optFortheta = optim.Adam(rec_model.parameters(), lr=rec_lr)
         self.optForvar   = optim.Adam(var_model.parameters(), lr=var_lr)
         
-    def stageTwo(self, rating, gamma, xij):
+    def stageTwo(self, rating, gamma, xij, pij=None):
         """
         using the same data as stage one.
         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
@@ -37,27 +37,37 @@ class ELBO:
         rating : torch.Tensor
         gamma  : torch.Tensor
         xij    : torch.Tensor
-                
+        
         try:
             assert rating.size() == gamma.size() == xij.size()
             assert len(rating.size()) == 1
+            if pij is not None:
+                assert rating.size() == pij.size()
         except ValueError:
             print("input error!")
             print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
-        gamma = gamma + self.eps
-        same_term   = log(( 1-self.eta + self.eps)/gamma )
-        part_one    = xij*log( (rating + self.eps)/self.epsilon ) \
-                        + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
-                        + log(self.eta/gamma) \
-                        - same_term
-        part_two    = (self.cross(xij, self.epsilon) + same_term)/gamma
-
+        if pij is None:
+            gamma = gamma + self.eps
+            same_term   = log(( 1-self.eta + self.eps)/gamma )
+            part_one    = xij*log( (rating + self.eps)/self.epsilon ) \
+                            + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
+                            + log(self.eta/gamma) \
+                            - same_term
+            part_two    = (self.cross(xij, self.epsilon) + same_term)/gamma
+        else:
+            pij = pij + self.eps
+            same_term = log(( 1-self.eta + self.eps)/gamma )
+            part_one    = xij*log( (rating + self.eps)/self.epsilon ) \
+                            + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
+                            + log(self.eta/gamma) \
+                            - same_term
+            part_one    = part_one*gamma/pij
+            part_two    = (self.cross(xij, self.epsilon) + same_term)/pij
+    
         loss1       = torch.sum(part_one)
         loss2       = torch.sum(part_two)
-        # print(loss1, loss2)
-        # print(gamma)
-        # print(torch.sum(self.cross(gamma, gamma)/gamma))
         loss: torch.Tensor = -(loss1+loss2)
+        
         if torch.isnan(loss) or torch.isinf(loss):
             print("loss1:", loss1)
             print("loss2:", loss2)
@@ -70,7 +80,7 @@ class ELBO:
 
         return cri
              
-    def stageOne(self, rating, xij):
+    def stageOne(self, rating, xij, gamma=None,pij=None):
         """
         optimize recommender parameters
         same as samwalk, using BCE loss here
@@ -78,12 +88,21 @@ class ELBO:
         so if we divide loss by pij, then the rij coefficient will be eliminated.
         And we get BCE loss here(without `mean`)
         """
-        loss: torch.Tensor = self.bce(rating, xij)*len(rating)
+        if pij is None:
+            loss: torch.Tensor = self.bce(rating, xij)*len(rating)
+        else:
+            if gamma is None:
+                raise ValueError("You should input gamma and pij in the same time  \
+                                 to calculate the loss for recommendation model")
+            assert pij.size() == gamma.size()
+            pij = pij + self.eps
+            part_one = ELBO.cross(xij, rating)
+            part_one = part_one*gamma/pij
+            loss : torch.Tensor = -torch.sum(part_one)
         cri = loss.data
         self.optFortheta.zero_grad()
         loss.backward()
         self.optFortheta.step()
-  
         return cri
         
     @staticmethod
