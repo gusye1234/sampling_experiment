@@ -1,8 +1,10 @@
+import world
 import torch
 from torch import nn, optim
 import numpy as np
 from torch import log
 from dataloader import BasicDataset
+from model import VarMF, VarMF_reg
 
 class ELBO:
     """
@@ -111,10 +113,73 @@ class ELBO:
         b : torch.Tensor
         return a*torch.log(b + ELBO.eps) + (1-a)*torch.log(1-b + ELBO.eps) 
         
-# =========================================
+# ==================Samplers=======================
+# =================================================
 # TODO
-def SampleByGamma():
-    pass
+
+
+class Sample_MF:
+    """
+    implement the sample procedure
+    we have:
+        items: (m, d)
+        user: (n, d)
+        gamma: (n,m)
+        D_k: sum(items, axis=0) => (d)
+        S_i: sum(gamma, axis=1) => (n)
+    NOTE:
+        consider the huge dataset we may have, when calculate the probability,
+        we turn off the gradient recording function, only return users and items list. 
+        
+    """
+    def __init__(self, k, var_model:VarMF_reg):
+        self.k = k
+        self.model = var_model
+        self.__compute = False
+        self.__prob = {}
+            
+    def compute(self):
+        """
+        compute everything we need in the sampling.        
+        """
+        with torch.no_grad():
+            u_emb : torch.Tensor = self.model.getAllUsersEmbedding() # shape (n,d)
+            i_emb : torch.Tensor = self.model.getAllItemsEmbedding() # shape (m,d)
+            gamma = torch.matmul(u_emb, i_emb.t()) # shape (n,m)
+            D_k = torch.sum(i_emb, dim=0) # shape (d)
+            S_i = torch.sum(gamma, dim=1) # shape (n)
+            p_i = S_i/torch.sum(S_i) # shape (n)
+            p_jk = (i_emb/D_k).t()  # shape (d,m)
+            p_ki = ((u_emb*D_k)/S_i.unsqueeze(dim=1)) # shape (n, d)
+            self.__compute = True
+            self.__prob['u_emb']  = u_emb
+            self.__prob['i_emb']  = i_emb
+            self.__prob['gamma']  = gamma
+            self.__prob['D_k']    = D_k
+            self.__prob['S_i']    = S_i
+            self.__prob['p(i)']   = p_i
+            self.__prob['p(k|i)'] = p_ki
+            self.__prob['p(j|k)'] = p_jk
+    
+    def sample(self, notcompute=False):
+        """
+        
+        """
+        if self.__compute:
+            pass
+        elif notcompute and len(self.__prob) != 0:
+            pass
+        else:
+            self.compute()
+        self.__compute = False
+        users = torch.multinomial(self.__prob['p(i)'], self.k, replacement=True)
+        candi_dim = self.__prob['p(k|i)'][users]
+        dims = torch.multinomial(candi_dim, 1)
+        dims = dims.squeeze(dim=1)
+        candi_items = self.__prob['p(j|k)'][dims]
+        items = torch.multinomial(candi_items, 1).squeeze(dim=1)
+        return users, items
+
 
 def UniformSample(users, dataset, k=1):
     """
@@ -136,9 +201,14 @@ def UniformSample(users, dataset, k=1):
         S.append(np.hstack([onePos, kNeg]))
     return np.array(S)
         
-# =========================================
+# ===================end samplers==========================
+# =========================================================
 
-# Metrics
+
+
+# ====================Metrics==============================
+# =========================================================
+
 def recall_precisionATk(test_data, pred_data, k=5):
     """
     test_data should be a list? cause users may have different amount of pos items. shape (test_batch, k)
@@ -192,7 +262,8 @@ def NDCGatK(test_data, pred_data, k):
     pred_rel = pred_rel/coefficients
     ndcg     = np.sum(pred_rel, axis=1)
     return np.mean(ndcg)
-
+# ====================end Metrics=============================
+# =========================================================
 
 
 if __name__ == "__main__":
@@ -200,7 +271,18 @@ if __name__ == "__main__":
     test_rating = torch.rand(10,1)
     test_gamma  = torch.rand(10,1)
     test_xij    = torch.rand(10,1)
-    loss_test = ELBO(config)
-    print(loss_test(test_rating, test_gamma, test_xij))
-    
+    # loss_test = ELBO(config)
+
+    from pprint import pprint
+    world.config['num_users'] = 4000
+    world.config['num_items'] = 8000
+    text_sample = VarMF_reg(world.config)
+    sampler = Sample_MF(k=10, var_model=text_sample)
+    for i in range(10):
+        sampler.compute()
+        users, items = sampler.sample()
+        print("==")
+        pprint(users)
+        pprint(items)
+
         

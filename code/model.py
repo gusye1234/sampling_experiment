@@ -79,7 +79,7 @@ class VarMF_reg(nn.Module):
     Use softmax to regularize Item embedding
     """
     def __init__(self, config):
-        super(VarMF, self).__init__()
+        super(VarMF_reg, self).__init__()
         self.num_users  = config['num_users']
         self.num_items  = config['num_items']
         self.latent_dim = config['latent_dim_var']
@@ -111,6 +111,28 @@ class VarMF_reg(nn.Module):
         with torch.no_grad():
             users_emb = self.embedding_user(users)
             return self.sig(users_emb)
+    
+    def getAllItemsEmbedding(self):
+        with torch.no_grad():
+            items_emb = self.embedding_item.weight
+            items_emb = self.soft(items_emb)
+            return items_emb
+    
+    def getAllUsersEmbedding(self):
+        with torch.no_grad():
+            users_emb = self.embedding_user.weight
+            users_emb = self.sig(users_emb)
+            return users_emb    
+
+        
+    # def getGammaForUsers(self, users):
+    #     """
+    #     calculate gammas of all items for specific users
+    #     """
+    #     with torch.no_grad():
+    #         users_emb = self.embedding_user(users)
+    #         users_emb = self.sig(users_emb)
+    #         items = self.getAllItemsEmbedding()
     
     def getAllItemsEmbedding(self):
         """

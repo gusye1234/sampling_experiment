@@ -1,3 +1,4 @@
+import torch
 # hyperparameters 
 config = {}
 config['alpha'] = 100
@@ -10,8 +11,26 @@ config['batch_size'] = 5
 # ======================
 TRAIN_epochs = 1000
 comment = "MF version"
-tensorboard = False
+tensorboard = True
+GPU = torch.cuda.is_available()
+
 
 # let pandas shut up
 from warnings import simplefilter
 simplefilter(action="ignore", category=FutureWarning)
+
+
+
+logo = r"""
+  _____
+ /     \
+/  __   \
+| |  \__|
+\ \
+ \ \
+ _\ \  
+/ |\_\
+\ \__||
+ \____/
+"""
+print(logo)
