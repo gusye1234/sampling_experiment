@@ -157,6 +157,47 @@ class Sample_MF:
     def setK(self,k):
         self.k = k
     
+    def sampleForEpoch(self, epoch_k, notcompute=False):
+        """
+        sample pairs for a whole epoch, `epoch_k` samples.
+        the strategy changes
+        """
+        if self.__compute:
+            pass
+        elif notcompute and len(self.__prob) != 0:
+            pass
+        else:
+            self.compute()
+        self.__compute = False
+        expected_Users = self.__prob['p(i)']*epoch_k
+        Userbase       = expected_Users.int() 
+        # int() will floor the numbers, like 1.4 -> 1
+        AddOneProbs    = expected_Users - Userbase
+        AddOnes        = torch.bernoulli(AddOneProbs)
+        expected_Users = Userbase + AddOnes
+        expected_Users = expected_Users.int()
+        Samusers = None
+        Samitems = None
+        for user_id, sample_times in enumerate(expected_Users):
+            items = self.sampleForUser(user_id, times=sample_times)
+            users = torch.Tensor([user_id]*sample_times).long()
+            if Samusers is None:
+                Samusers = users
+                Samitems = items
+            else:
+                Samusers = torch.cat([Samusers, users])
+                Samitems = torch.cat([Samitems, items])
+        return Samusers, Samitems
+        
+    def sampleForUser(self, user, times=1):
+        candi_dim = self.__prob['p(k|i)'][user].squeeze()
+        dims = torch.multinomial(candi_dim, times)
+        candi_items = self.__prob['p(j|k)'][dims]
+        items = torch.multinomial(candi_items, 1).squeeze(dim=1)
+        return items.long()        
+
+        
+    
     def compute(self):
         """
         compute everything we need in the sampling.        
@@ -182,7 +223,7 @@ class Sample_MF:
     
     def sample(self, notcompute=False):
         """
-        
+        sample self.k samples
         """
         if self.__compute:
             pass
@@ -225,6 +266,39 @@ def UniformSample(users, dataset, k=1):
 # =========================================================
 
 
+def minibatch(*tensors, **kwargs):
+
+    batch_size = kwargs.get('batch_size', world.config['batch_size'])
+
+    if len(tensors) == 1:
+        tensor = tensors[0]
+        for i in range(0, len(tensor), batch_size):
+            yield tensor[i:i + batch_size]
+    else:
+        for i in range(0, len(tensors[0]), batch_size):
+            yield tuple(x[i:i + batch_size] for x in tensors)
+
+
+def shuffle(*arrays, **kwargs):
+
+    require_indices = kwargs.get('indices', False)
+
+    if len(set(len(x) for x in arrays)) != 1:
+        raise ValueError('All inputs to shuffle must have '
+                         'the same length.')
+
+    shuffle_indices = np.arange(len(arrays[0]))
+    np.random.shuffle(shuffle_indices)
+
+    if len(arrays) == 1:
+        result = arrays[0][shuffle_indices]
+    else:
+        result = tuple(x[shuffle_indices] for x in arrays)
+
+    if require_indices:
+        return result, shuffle_indices
+    else:
+        return result
 
 # ====================Metrics==============================
 # =========================================================

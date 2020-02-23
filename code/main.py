@@ -43,26 +43,22 @@ else:
 
 # train
 Neg_k = 2
-Total_batch = int(len(dataset)/world.config['batch_size'])
+world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
 
 
 if world.tensorboard:
     w : SummaryWriter = SummaryWriter("./output/"+ "runs/"+time.strftime("%m-%d-%H:%M:%S-") + "-" + world.comment)
+else:
+    w = None
 try:
     for i in range(world.TRAIN_epochs):
-        for batch_i, batch_data in tqdm(enumerate(lm_loader)):
-            if world.sampling_type == "uniform":
-                loss1 = TrainProcedure.uniform_train(batch_data, dataset, Recmodel, elbo, Neg_k)
-                if world.tensorboard:
-                    w.add_scalar(f'UniformLoss/BCE', loss1, i*Total_batch + batch_i)
-            else:
-                loss1, loss2, exposed_users, exposed_items = TrainProcedure.sampler_train(dataset, sampler, Recmodel, Varmodel, elbo, world.config['batch_size'])
-                if world.tensorboard:
-                    w.add_scalar(f'SamplerLoss/stageOne', loss1, i*Total_batch + batch_i)
-                    w.add_scalar(f'SamplerLoss/stageTwo', loss2, i*Total_batch + batch_i)
-                    w.add_scalar( 'SamplerLoss/exposedUser', exposed_users, i*Total_batch + batch_i)
-                    w.add_scalar( 'SamplerLoss/exposedItems', exposed_items, i*Total_batch + batch_i)
-            # print((loss1, loss2))
+        # for batch_i, batch_data in tqdm(enumerate(lm_loader)):
+        if world.sampling_type == "uniform":
+            TrainProcedure.uniform_train(dataset, lm_loader, Recmodel, elbo, Neg_k, i, w)
+        else:
+            epoch_k = dataset.n_users*5
+            TrainProcedure.sampler_train(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
+            
 finally:
     if world.tensorboard:
         w.close()
