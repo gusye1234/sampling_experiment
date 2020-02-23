@@ -1,3 +1,6 @@
+"""
+Define models here
+"""
 import torch
 from torch import nn
 

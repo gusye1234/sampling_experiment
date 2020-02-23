@@ -1,3 +1,6 @@
+"""
+Design training process
+"""
 import world
 import numpy as np
 import torch
@@ -10,7 +13,7 @@ def uniform_train(dataset, loader,recommend_model, loss_class, Neg_k, epoch, w=N
     # batch_data = user_batch
     Recmodel = recommend_model
     bce : utils.BCE = loss_class
-    for batch_i, batch_data in tqdm(enumerate(loader)):
+    for batch_i, batch_data in enumerate(loader):
         
         users = batch_data.numpy() # (batch_size, 1)
         # 1.
@@ -66,7 +69,7 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
                                             epoch_items.cpu().numpy()).astype('int')
 
     # print(epoch_users.size(), epoch_items.size(), epoch_xij.shape)
-    print(epoch_users[:5], epoch_items[:5], epoch_xij[:5])
+    # print(epoch_users[:5], epoch_items[:5], epoch_xij[:5])
     for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
         users = batch_users.long()
         # print(users.size())
@@ -85,24 +88,3 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
         if world.tensorboard:
             w.add_scalar(f'SamplerLoss/stageOne', loss1, epoch*world.config['total_batch'] + batch_i)
             w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch*world.config['total_batch'] + batch_i)
-            # w.add_scalar( 'SamplerLoss/exposedUser', exposed_users, epoch*world.config['total_batch'] + batch_i)
-            # w.add_scalar( 'SamplerLoss/exposedItems', exposed_items, epoch*world.config['total_batch'] + batch_i)
-    
-    
-        # users_set = users_set.union(list(users.numpy()))
-        # items_set = items_set.union(list(items.numpy()))
-        
-        # end = time()
-        # print("sample time:", end-start)
-        # 2.
-        # process xij
-        # xij = dataset.getUserItemFeedback(users.cpu().numpy().astype('int'), items.cpu().numpy().astype('int'))
-        # xij = torch.Tensor(xij).cuda() if world.GPU else torch.Tensor(xij)
-        
-        # users = users.long()
-        # items = items.long()
-        # 3.
-        # optimize loss
-        # start = time()
-    
-    

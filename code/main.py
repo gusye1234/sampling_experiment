@@ -1,4 +1,5 @@
 import world
+from world import SamplingAlgorithms
 import torch
 from torch.utils.data import DataLoader
 import model
@@ -23,13 +24,14 @@ print('===========config================')
 pprint(world.config)
 print(world.comment)
 print("tensorboard:", world.tensorboard)
+print(world.sampling_type)
 print('===========end===================')
 # initialize models
 
-if world.sampling_type == 'uniform':
+if world.sampling_type == SamplingAlgorithms.uniform:
     Recmodel = model.RecMF(world.config)
     elbo     = utils.BCE(Recmodel)
-else:
+elif world.sampling_type == SamplingAlgorithms.sampler:
     Recmodel = model.RecMF(world.config)
     # Varmodel = model.VarMF(world.config)
     Varmodel = model.VarMF_reg(world.config)
@@ -51,11 +53,11 @@ if world.tensorboard:
 else:
     w = None
 try:
-    for i in range(world.TRAIN_epochs):
+    for i in tqdm(range(world.TRAIN_epochs)):
         # for batch_i, batch_data in tqdm(enumerate(lm_loader)):
-        if world.sampling_type == "uniform":
+        if world.sampling_type == SamplingAlgorithms.uniform:
             TrainProcedure.uniform_train(dataset, lm_loader, Recmodel, elbo, Neg_k, i, w)
-        else:
+        elif world.sampling_type == SamplingAlgorithms.sampler:
             epoch_k = dataset.n_users*5
             TrainProcedure.sampler_train(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
             

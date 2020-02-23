@@ -1,3 +1,7 @@
+"""
+Including Sampling Algorithms
+and help functions 
+"""
 import world
 import torch
 from torch import nn, optim
@@ -136,8 +140,8 @@ class BCE:
 
 class Sample_MF:
     """
-    implement the sample procedure
-    we have:
+    implement the sample procedure \n
+    we have: \n
         items: (m, d)
         user: (n, d)
         gamma: (n,m)
@@ -191,7 +195,7 @@ class Sample_MF:
         
     def sampleForUser(self, user, times=1):
         candi_dim = self.__prob['p(k|i)'][user].squeeze()
-        dims = torch.multinomial(candi_dim, times)
+        dims = torch.multinomial(candi_dim, times,replacement=True)
         candi_items = self.__prob['p(j|k)'][dims]
         items = torch.multinomial(candi_items, 1).squeeze(dim=1)
         return items.long()        
