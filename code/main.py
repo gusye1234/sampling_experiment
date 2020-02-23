@@ -49,18 +49,27 @@ world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
 
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("./output/"+ "runs/"+time.strftime("%m-%d-%H:%M:%S-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter("./output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
 try:
-    for i in tqdm(range(world.TRAIN_epochs)):
+    bar = tqdm(range(world.TRAIN_epochs))
+    for i in bar:
         # for batch_i, batch_data in tqdm(enumerate(lm_loader)):
         if world.sampling_type == SamplingAlgorithms.uniform:
-            TrainProcedure.uniform_train(dataset, lm_loader, Recmodel, elbo, Neg_k, i, w)
+            output_information = TrainProcedure.uniform_train(dataset, lm_loader, Recmodel, elbo, Neg_k, i, w)
         elif world.sampling_type == SamplingAlgorithms.sampler:
             epoch_k = dataset.n_users*5
-            TrainProcedure.sampler_train(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
-            
+            output_information = TrainProcedure.sampler_train(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
+        bar.set_description('[SAVE]' + output_information)
+        torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
+        if globals().get('Varmodel'):
+            torch.save(Varmodel.state_dict(), f"../checkpoints/Var-{world.sampling_type.name}.pth.tar")
+        if i%5 == 0:
+            # test
+            bar.set_description("[TEST]")
+            testDict = dataset.getTestDict()
+            TrainProcedure.Test(testDict, Recmodel, world.top_k, i, w)
 finally:
     if world.tensorboard:
         w.close()

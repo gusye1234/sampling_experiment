@@ -21,6 +21,12 @@ class RecMF(nn.Module):
             num_embeddings=self.num_items, embedding_dim=self.latent_dim)
         self.f = nn.Sigmoid()
     
+    def getUsersRating(self, users):
+        users_emb = self.embedding_user(users.long())
+        items_emb = self.embedding_item.weight
+        rating = self.f(torch.matmul(users_emb, items_emb.t()))
+        return rating
+    
     def forward(self, users, items):
         try:
             assert len(users) == len(items)

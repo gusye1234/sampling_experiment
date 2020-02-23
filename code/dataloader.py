@@ -17,6 +17,7 @@ class BasicDataset(Dataset):
     def __init__(self):
         self.n_users = None
         self.m_items = None
+        self.__testDict = None
         
     def getUserItemFeedback(self, users, items):
         raise NotImplementedError
@@ -24,11 +25,12 @@ class BasicDataset(Dataset):
         raise NotImplementedError
     def getUserNegItems(self, users):
         raise NotImplementedError
-
+    def getTestDict(self):
+        raise NotImplementedError
 
 class LastFM(BasicDataset):
     """
-    Dataset type for pytorch
+    Dataset type for pytorch \n
     Incldue graph information
     LastFM dataset
     """
@@ -53,7 +55,7 @@ class LastFM(BasicDataset):
         self.trainUser = np.array(trainData[:][0])
         self.trainItem = np.array(trainData[:][1])
         self.testUser  = np.array(testData[:][0])
-        self.testUser  = np.array(testData[:][1])
+        self.testItem  = np.array(testData[:][1])
         print(f"LastFm Sparsity : {(len(self.trainUser) + len(self.testUser))/self.n_users/self.m_items}")
         
         # (users,users)
@@ -69,7 +71,24 @@ class LastFM(BasicDataset):
             pos = set(self.allPos[i])
             neg = allItems - pos
             self.allNeg.append(list(neg))
+        self.__testDict = self.__build_test()
 
+    def __build_test(self):
+        """
+        return:
+            dict: {user: [items]}
+        """
+        test_data = {}
+        for i, item in enumerate(self.testItem):
+            user = self.testUser[i]
+            if test_data.get(user):
+                test_data[user].append(item)
+            else:
+                test_data[user] = [item]
+        return test_data
+    
+    def getTestDict(self):
+        return self.__testDict
     
     def getUserItemFeedback(self, users, items):
         """
@@ -81,7 +100,7 @@ class LastFM(BasicDataset):
             feedback [-1]
         """
         # print(self.UserItemNet[users, items])
-        return np.array(self.UserItemNet[users, items]).astype('uint8').reshape(-1)
+        return np.array(self.UserItemNet[users, items]).astype('uint8').reshape((-1, ))
     
     def getUserPosItems(self, users):
         posItems = []
@@ -156,6 +175,25 @@ class MovLens(BasicDataset):
             pos = set(self.allPos[i])
             neg = allItems - pos
             self.allNeg.append(list(neg))
+        self.__testData = self.__build_test()
+        
+            
+    def __build_test(self):
+        """
+        return:
+            dict: {user: [items]}
+        """
+        test_data = {}
+        for i, item in enumerate(self.testItem):
+            user = self.testUser[i]
+            if test_data.get(user):
+                test_data[user].append(item)
+            else:
+                test_data[user] = [item]
+        return test_data
+    
+    def getTestDict(self):
+        return self.__testDict
 
     def extract_users_and_items(self, rating):
         """Extract users and items from rating data

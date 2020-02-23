@@ -26,7 +26,7 @@ class ELBO:
     """
     eps = torch.Tensor([1e-8]).float()
     def __init__(self, config,
-                 rec_model, var_model, rec_lr=0.005, var_lr=0.005):
+                 rec_model, var_model, rec_lr=0.005, var_lr=0.001):
         rec_model : nn.Module
         var_model : nn.Module
         self.epsilon = torch.Tensor([config['epsilon']])
@@ -64,8 +64,14 @@ class ELBO:
                         + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
                         + log(self.eta/gamma) \
                         - same_term
-        part_one    = part_one*gamma/pij
-        part_two    = (self.cross(xij, self.epsilon) + same_term)/pij
+        out_one  = (part_one*gamma).detach()
+        part_one    = part_one*gamma/pij 
+        
+        part_two = (self.cross(xij, self.epsilon) + same_term)
+        out_two  = part_two.detach()
+        part_two = part_two/pij
+        
+        out_loss = -(torch.sum(out_one) + torch.sum(out_two))
         
         loss1       = torch.sum(part_one)
         loss2       = torch.sum(part_two)
@@ -75,7 +81,7 @@ class ELBO:
             print("loss1:", loss1)
             print("loss2:", loss2)
             raise ValueError("nan or inf")
-        cri = loss.data
+        cri = out_loss.item()
         
         self.optForvar.zero_grad()
         loss.backward()
@@ -335,11 +341,12 @@ def MRRatK(test_data, pred_data, k):
         groundTrue = test_data[i]
         prediction = pred_data[i]
         for j, item in enumerate(prediction):
+            if j >= k:
+                break
             if item in groundTrue:
                 scores += 1/(j+1)
                 break
-            if j >= k:
-                break
+            
     return scores/MRR_n
 
 def NDCGatK(test_data, pred_data, k):
@@ -351,12 +358,16 @@ def NDCGatK(test_data, pred_data, k):
     pred_rel = []
     for i in range(len(test_data)):
         groundTrue = test_data[i]
-        pred = list(filter(lambda x: x in groundTrue, pred_data[i][:k]))
+        pred = list(map(lambda x: x in groundTrue, pred_data[i][:k]))
         pred = np.array(pred).astype("uint8")
+        # print(pred)
         pred_rel.append(pred)
     pred_rel = np.array(pred_rel)
     coefficients = np.log2(np.arange(2, k+2))
+    # print(coefficients.shape, pred_rel.shape)
+    # print(coefficients)
     assert len(coefficients) == pred_rel.shape[-1]
+    
     pred_rel = pred_rel/coefficients
     ndcg     = np.sum(pred_rel, axis=1)
     return np.mean(ndcg)

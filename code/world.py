@@ -2,8 +2,10 @@
 Store global parameters here
 """
 import torch
+import os
 from enum import Enum
 
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 # hyperparameters 
 config = {}
 config['alpha'] = 100
@@ -15,6 +17,7 @@ config['latent_dim_var'] = 64
 config['batch_size'] = 200
 # ======================
 TRAIN_epochs = 1000
+top_k = 5
 comment = "MF_version_add_reg"
 tensorboard = True
 GPU = torch.cuda.is_available()
@@ -31,16 +34,16 @@ simplefilter(action="ignore", category=FutureWarning)
 
 
 
+
+
 logo = r"""
-  _____
- /     \
-/  __   \
-| |  \__|
-\ \
- \ \
- _\ \  
-/ |\_\
-\ \__||
- \____|
+███████╗ █████╗ ███╗   ███╗██████╗ ██╗     ██╗███╗   ██╗ ██████╗ 
+██╔════╝██╔══██╗████╗ ████║██╔══██╗██║     ██║████╗  ██║██╔════╝ 
+███████╗███████║██╔████╔██║██████╔╝██║     ██║██╔██╗ ██║██║  ███╗
+╚════██║██╔══██║██║╚██╔╝██║██╔═══╝ ██║     ██║██║╚██╗██║██║   ██║
+███████║██║  ██║██║ ╚═╝ ██║██║     ███████╗██║██║ ╚████║╚██████╔╝
+╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝     ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ 
 """
+# font: ANSI Shadow
+# refer to http://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=Sampling
 print(logo)
