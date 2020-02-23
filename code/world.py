@@ -7,13 +7,15 @@ config['eta']   = 0.5
 config['epsilon'] = 0.001
 config['latent_dim_rec'] = 64
 config['latent_dim_var'] = 64
-config['batch_size'] = 5
+config['batch_size'] = 200
 # ======================
 TRAIN_epochs = 1000
-comment = "MF version"
+comment = "MF version, add reg"
 tensorboard = True
 GPU = torch.cuda.is_available()
 
+
+sampling_type = 'sampler'
 
 # let pandas shut up
 from warnings import simplefilter
@@ -31,6 +33,6 @@ logo = r"""
  _\ \  
 / |\_\
 \ \__||
- \____/
+ \____|
 """
 print(logo)

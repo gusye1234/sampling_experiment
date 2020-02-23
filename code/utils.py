@@ -6,6 +6,9 @@ from torch import log
 from dataloader import BasicDataset
 from model import VarMF, VarMF_reg
 
+
+
+
 class ELBO:
     """
     class for criterion L(theta, q; x_ij)
@@ -19,7 +22,7 @@ class ELBO:
     """
     eps = torch.Tensor([1e-8]).float()
     def __init__(self, config,
-                 rec_model, var_model, rec_lr=0.05, var_lr=0.05):
+                 rec_model, var_model, rec_lr=0.005, var_lr=0.005):
         rec_model : nn.Module
         var_model : nn.Module
         self.epsilon = torch.Tensor([config['epsilon']])
@@ -48,24 +51,18 @@ class ELBO:
         except ValueError:
             print("input error!")
             print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
+        gamma = gamma + self.eps
         if pij is None:
-            gamma = gamma + self.eps
-            same_term   = log(( 1-self.eta + self.eps)/gamma )
-            part_one    = xij*log( (rating + self.eps)/self.epsilon ) \
-                            + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
-                            + log(self.eta/gamma) \
-                            - same_term
-            part_two    = (self.cross(xij, self.epsilon) + same_term)/gamma
-        else:
-            pij = pij + self.eps
-            same_term = log(( 1-self.eta + self.eps)/gamma )
-            part_one    = xij*log( (rating + self.eps)/self.epsilon ) \
-                            + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
-                            + log(self.eta/gamma) \
-                            - same_term
-            part_one    = part_one*gamma/pij
-            part_two    = (self.cross(xij, self.epsilon) + same_term)/pij
-    
+            pij = gamma.detach()
+            
+        same_term   = log(( 1-self.eta + self.eps)/(1-gamma+2*self.eps))
+        part_one    = xij*log( (rating + self.eps)/self.epsilon ) \
+                        + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
+                        + log(self.eta/gamma) \
+                        - same_term
+        part_one    = part_one*gamma/pij
+        part_two    = (self.cross(xij, self.epsilon) + same_term)/pij
+        
         loss1       = torch.sum(part_one)
         loss2       = torch.sum(part_two)
         loss: torch.Tensor = -(loss1+loss2)
@@ -112,6 +109,25 @@ class ELBO:
         a : torch.Tensor
         b : torch.Tensor
         return a*torch.log(b + ELBO.eps) + (1-a)*torch.log(1-b + ELBO.eps) 
+
+class BCE:
+    """
+    warp bce loss
+    """
+    def __init__(self, rec_model, lr=0.05):
+        self.bce     = nn.BCELoss()
+        self.model   = rec_model
+        self.opt     = optim.Adam(rec_model.parameters(), lr=lr)
+    
+    def stageOne(self, rating, xij):
+        loss = self.bce(rating, xij)
+        cri = loss.data
+        self.opt.zero_grad()
+        loss.backward()
+        self.opt.step()
+        return cri
+        
+
         
 # ==================Samplers=======================
 # =================================================
@@ -138,6 +154,9 @@ class Sample_MF:
         self.__compute = False
         self.__prob = {}
             
+    def setK(self,k):
+        self.k = k
+    
     def compute(self):
         """
         compute everything we need in the sampling.        
@@ -178,6 +197,7 @@ class Sample_MF:
         dims = dims.squeeze(dim=1)
         candi_items = self.__prob['p(j|k)'][dims]
         items = torch.multinomial(candi_items, 1).squeeze(dim=1)
+        # print(users.size(), items.size())
         return users, items
 
 
