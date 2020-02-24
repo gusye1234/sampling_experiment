@@ -54,6 +54,7 @@ class LastFM(BasicDataset):
         self.testData  = testData
         self.trainUser = np.array(trainData[:][0])
         self.trainItem = np.array(trainData[:][1])
+        self.trainDataSize = len(self.trainUser)
         self.testUser  = np.array(testData[:][0])
         self.testItem  = np.array(testData[:][1])
         print(f"LastFm Sparsity : {(len(self.trainUser) + len(self.testUser))/self.n_users/self.m_items}")
@@ -161,6 +162,7 @@ class MovLens(BasicDataset):
         #print(self.n_users, self.m_items)
         self.trainUser = np.array(self.trainData['user'])
         self.trainItem = np.array(self.trainData['item'])
+        self.trainDataSize = len(self.trainUser)
 
         self.testUser = np.array(self.testData['user'])
         self.testItem = np.array(self.testData['item'])

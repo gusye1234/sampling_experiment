@@ -215,16 +215,17 @@ class Sample_MF:
         with torch.no_grad():
             u_emb : torch.Tensor = self.model.getAllUsersEmbedding() # shape (n,d)
             i_emb : torch.Tensor = self.model.getAllItemsEmbedding() # shape (m,d)
-            gamma = torch.matmul(u_emb, i_emb.t()) # shape (n,m)
+            # gamma = torch.matmul(u_emb, i_emb.t()) # shape (n,m)
             D_k = torch.sum(i_emb, dim=0) # shape (d)
-            S_i = torch.sum(gamma, dim=1) # shape (n)
+            S_i = torch.sum(u_emb*D_k, dim=1) # shape (n)
+            # S_i = torch.sum(gamma, dim=1) # shape (n)
             p_i = S_i/torch.sum(S_i) # shape (n)
             p_jk = (i_emb/D_k).t()  # shape (d,m)
             p_ki = ((u_emb*D_k)/S_i.unsqueeze(dim=1)) # shape (n, d)
             self.__compute = True
             self.__prob['u_emb']  = u_emb
             self.__prob['i_emb']  = i_emb
-            self.__prob['gamma']  = gamma
+            # self.__prob['gamma']  = gamma
             self.__prob['D_k']    = D_k
             self.__prob['S_i']    = S_i
             self.__prob['p(i)']   = p_i
@@ -359,7 +360,7 @@ def NDCGatK(test_data, pred_data, k):
     for i in range(len(test_data)):
         groundTrue = test_data[i]
         pred = list(map(lambda x: x in groundTrue, pred_data[i][:k]))
-        pred = np.array(pred).astype("uint8")
+        pred = np.array(pred).astype("float")
         # print(pred)
         pred_rel.append(pred)
     pred_rel = np.array(pred_rel)

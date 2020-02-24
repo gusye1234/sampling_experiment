@@ -47,6 +47,41 @@ def uniform_train(dataset, loader,recommend_model, loss_class, Neg_k, epoch, w=N
 
 # users_set = set()
 # items_set = set()
+def sampler_train_no_batch(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch_k, epoch,w):
+    # global users_set, items_set
+    sampler : utils.Sample_MF
+    dataset : dataloader.BasicDataset
+    recommend_model.train()
+    var_model_reg.train()
+    loss_class : utils.ELBO
+    # 1.
+    # sampling
+    # start = time()
+    sampler.compute()
+    epoch_users, epoch_items = sampler.sampleForEpoch(epoch_k) # epoch_k may be 5*n
+
+    epoch_users, epoch_items = utils.shuffle(epoch_users, epoch_items)
+    epoch_xij = dataset.getUserItemFeedback(epoch_users.cpu().numpy(),
+                                            epoch_items.cpu().numpy()).astype('int')
+    # print(f"[{epoch}]Positive Label Sparsity",np.sum(epoch_xij)/len(epoch_xij))
+    # print(epoch_users[:5], epoch_items[:5], epoch_xij[:5])
+    epoch_users = epoch_users.long()
+    epoch_items = epoch_items.long()
+    epoch_xij   = torch.Tensor(epoch_xij)
+    
+    epoch_rating = recommend_model(epoch_users, epoch_items)
+    loss1 = loss_class.stageOne(epoch_rating, epoch_xij)
+    
+    rating = recommend_model(epoch_users, epoch_items)
+    gamma  = var_model_reg(epoch_users, epoch_items)
+    
+    loss2  = loss_class.stageTwo(rating, gamma, xij)
+    
+    if world.tensorboard:
+        w.add_scalar(f'SamplerLoss/stageOne', loss1, epoch)
+        w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch)
+    return f"Sparsity {(torch.sum(epoch_xij)/len(epoch_xij)).item():.3f}"
+
 
 def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch_k, epoch,w):
     # global users_set, items_set
