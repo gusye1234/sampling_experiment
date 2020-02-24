@@ -14,6 +14,7 @@ import model
 def uniform_train(dataset, loader,recommend_model, loss_class, Neg_k, epoch, w=None):
     # batch_data = user_batch
     Recmodel = recommend_model
+    Recmodel.train()
     bce : utils.BCE = loss_class
     for batch_i, batch_data in enumerate(loader):
         
@@ -48,9 +49,11 @@ def uniform_train(dataset, loader,recommend_model, loss_class, Neg_k, epoch, w=N
 # items_set = set()
 
 def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch_k, epoch,w):
-    global users_set, items_set
+    # global users_set, items_set
     sampler : utils.Sample_MF
     dataset : dataloader.BasicDataset
+    recommend_model.train()
+    var_model_reg.train()
     loss_class : utils.ELBO
     # 1.
     # sampling
@@ -84,14 +87,26 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
     return f"Sparsity {np.sum(epoch_xij)/len(epoch_xij):.3f}"
 
 
-def Test(testDict, Recmodel, top_k, epoch, w=None):
-    testDict : dict
+def Test(dataset,Recmodel, top_k, epoch, w=None):
+    dataset : utils.BasicDataset
+    testDict : dict = dataset.getTestDict()
     Recmodel : model.RecMF
     with torch.no_grad():
         Recmodel.eval()
         users = torch.Tensor(list(testDict.keys()))
         GroundTrue = [testDict[user] for user in users.numpy()]
         rating = Recmodel.getUsersRating(users)
+        # exclude positive train data
+        allPos = dataset.getUserPosItems(users)
+        exclude_index = []
+        exclude_items = []
+        for range_i, items in enumerate(allPos):
+            exclude_index.extend([range_i]*len(items))
+            exclude_items.extend(items)
+        rating[exclude_index, exclude_items] = 0.
+        # assert torch.all(rating >= 0.)
+        # assert torch.all(rating <= 1.)
+        # end excluding
         _, top_items = torch.topk(rating, top_k)
         top_items = top_items.cpu().numpy()
         metrics = utils.recall_precisionATk(GroundTrue, top_items, top_k)

@@ -26,7 +26,7 @@ class ELBO:
     """
     eps = torch.Tensor([1e-8]).float()
     def __init__(self, config,
-                 rec_model, var_model, rec_lr=0.005, var_lr=0.001):
+                 rec_model, var_model, rec_lr=0.003, var_lr=0.003):
         rec_model : nn.Module
         var_model : nn.Module
         self.epsilon = torch.Tensor([config['epsilon']])

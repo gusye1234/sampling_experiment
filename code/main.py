@@ -69,7 +69,7 @@ try:
             # test
             bar.set_description("[TEST]")
             testDict = dataset.getTestDict()
-            TrainProcedure.Test(testDict, Recmodel, world.top_k, i, w)
+            TrainProcedure.Test(dataset, Recmodel, world.top_k, i, w)
 finally:
     if world.tensorboard:
         w.close()
