@@ -60,10 +60,10 @@ try:
             bar.set_description('[training]')
             output_information = TrainProcedure.uniform_train(dataset, lm_loader, Recmodel, elbo, Neg_k, i, w)
         elif world.sampling_type == SamplingAlgorithms.sampler:
-            # epoch_k = dataset.n_users*5
-            epoch_k = dataset.trainDataSize*5
+            epoch_k = dataset.n_users*5
+            # epoch_k = dataset.trainDataSize*5
             bar.set_description(f"[Sample {epoch_k}]")
-            output_information = TrainProcedure.sampler_train(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
+            output_information = TrainProcedure.sampler_train_no_batch(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
         bar.set_description('[SAVE]' + output_information)
         torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
         if globals().get('Varmodel'):

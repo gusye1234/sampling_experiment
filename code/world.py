@@ -19,7 +19,7 @@ config['batch_size'] = 200
 TRAIN_epochs = 1000
 top_k = 5
 comment = "MF_version_add_reg"
-tensorboard = False
+tensorboard = True
 GPU = torch.cuda.is_available()
 
 class SamplingAlgorithms(Enum):

@@ -72,11 +72,11 @@ def sampler_train_no_batch(dataset, sampler, recommend_model, var_model_reg, los
     epoch_rating = recommend_model(epoch_users, epoch_items)
     loss1 = loss_class.stageOne(epoch_rating, epoch_xij)
     
-    rating = recommend_model(epoch_users, epoch_items)
-    gamma  = var_model_reg(epoch_users, epoch_items)
+    epoch_rating = recommend_model(epoch_users, epoch_items)
+    epoch_gamma  = var_model_reg(epoch_users, epoch_items)
     
-    loss2  = loss_class.stageTwo(rating, gamma, xij)
-    
+    loss2  = loss_class.stageTwo(epoch_rating, epoch_gamma, epoch_xij)
+
     if world.tensorboard:
         w.add_scalar(f'SamplerLoss/stageOne', loss1, epoch)
         w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch)

@@ -328,8 +328,8 @@ def recall_precisionATk(test_data, pred_data, k=5):
         predictTopK= pred_data[i][:k]
         bingo      = list(filter(lambda x: x in groundTrue, predictTopK))
         right_items = len(bingo)
-        precis_n.append(float(bingo)/len(k))
-        recall_n.append(float(bingo)/len(groundTrue))
+        precis_n.append(float(right_items)/k)
+        recall_n.append(float(right_items)/len(groundTrue))
     return {'recall': np.mean(recall_n), 'precision': np.mean(precis_n)}
 
 def MRRatK(test_data, pred_data, k):
