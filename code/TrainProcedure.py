@@ -87,7 +87,7 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
     return f"Sparsity {np.sum(epoch_xij)/len(epoch_xij):.3f}"
 
 
-def Test(dataset,Recmodel, top_k, epoch, w=None):
+def Test(dataset, Recmodel, top_k, epoch, w=None):
     dataset : utils.BasicDataset
     testDict : dict = dataset.getTestDict()
     Recmodel : model.RecMF

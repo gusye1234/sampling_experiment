@@ -320,16 +320,16 @@ def recall_precisionATk(test_data, pred_data, k=5):
     k : top-k
     """
     assert len(test_data) == len(pred_data)
-    right_items = 0
-    recall_n    = 0
-    precis_n    = len(test_data)*k
+    recall_n    = []
+    precis_n    = []
     for i in range(len(test_data)):
         groundTrue = test_data[i]
         predictTopK= pred_data[i][:k]
         bingo      = list(filter(lambda x: x in groundTrue, predictTopK))
-        right_items+= len(bingo)
-        recall_n   += len(groundTrue)
-    return {'recall': right_items/recall_n, 'precision': right_items/precis_n}
+        right_items = len(bingo)
+        precis_n.append(float(bingo)/len(k))
+        recall_n.append(float(bingo)/len(groundTrue))
+    return {'recall': np.mean(recall_n), 'precision': np.mean(precis_n)}
 
 def MRRatK(test_data, pred_data, k):
     """
@@ -369,7 +369,9 @@ def NDCGatK(test_data, pred_data, k):
     assert len(coefficients) == pred_rel.shape[-1]
     
     pred_rel = pred_rel/coefficients
-    ndcg     = np.sum(pred_rel, axis=1)
+    idcg = np.sum(1. / np.log2(np.arange(2, k + 2)))
+    dcg = np.sum(pred_rel, axis=1)
+    ndcg = dcg/idcg
     return np.mean(ndcg)
 # ====================end Metrics=============================
 # =========================================================
