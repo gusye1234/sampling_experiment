@@ -120,13 +120,7 @@ class VarMF_reg(nn.Module):
         with torch.no_grad():
             users_emb = self.embedding_user(users)
             return self.sig(users_emb)
-    
-    def getAllItemsEmbedding(self):
-        with torch.no_grad():
-            items_emb = self.embedding_item.weight
-            items_emb = self.soft(items_emb)
-            return items_emb
-    
+
     def getAllUsersEmbedding(self):
         with torch.no_grad():
             users_emb = self.embedding_user.weight

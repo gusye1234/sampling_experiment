@@ -16,15 +16,23 @@ def uniform_train(dataset, loader,recommend_model, loss_class, Neg_k, epoch, w=N
     Recmodel = recommend_model
     Recmodel.train()
     bce : utils.BCE = loss_class
+    total_start = time()
+    sampling_time = 0.
+    process_time = 0.
+    train_time = 0.
+    
     for batch_i, batch_data in enumerate(loader):
         
         users = batch_data.numpy() # (batch_size, 1)
         # 1.
         # sample items
-        # start = time()
-        S = utils.UniformSample(users, dataset, k=Neg_k)
-        # end  = time()
+        start = time()
+        S, sam_time = utils.UniformSample(users, dataset, k=Neg_k)
+        # print(sam_time)
+        end  = time()
+        sampling_time += (end-start)
         
+        start = time()
         users = np.tile(users.reshape((-1,1)), (1, 1+Neg_k)).reshape(-1)
         S     = S.reshape(-1)
         # 2.
@@ -34,15 +42,22 @@ def uniform_train(dataset, loader,recommend_model, loss_class, Neg_k, epoch, w=N
         users = torch.Tensor(users).long()
         items = torch.Tensor(S).long()
         xij   = torch.Tensor(xij)
+        end = time()
+        process_time += (end-start)       
         # 3.
         # optimize loss
         # start = time()
+        start = time()
         rating = Recmodel(users, items)
         loss1  = bce.stageOne(rating, xij)
+        end = time()
+        train_time += (end-start)
         # end   = time()
         if world.tensorboard:
             w.add_scalar(f'UniformLoss/BCE', loss1, epoch*world.config['total_batch'] + batch_i)
-    return "uniform"
+    total_end = time()
+    total_time = total_end - total_start
+    return f"[UNI]{total_time:.1f}={sampling_time:.1f}+{process_time:.1f}+{train_time:.1f}"
 
 
 # users_set = set()

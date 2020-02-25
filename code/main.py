@@ -10,7 +10,7 @@ import TrainProcedure
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from pprint import pprint
-
+import os
 import time
 
 # loading data...
@@ -24,13 +24,18 @@ print('===========config================')
 pprint(world.config)
 print(world.comment)
 print("tensorboard:", world.tensorboard)
+print("LOAD:", world.LOAD)
+print("Weight path:", world.PATH)
 print(world.sampling_type)
 print('===========end===================')
-# initialize models
 
+# initialize models
 if world.sampling_type == SamplingAlgorithms.uniform:
     Recmodel = model.RecMF(world.config)
     elbo     = utils.BCE(Recmodel)
+    if world.LOAD:
+        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-uniform.pth.tar')))
+        Recmodel.train()
 elif world.sampling_type == SamplingAlgorithms.sampler:
     Recmodel = model.RecMF(world.config)
     # Varmodel = model.VarMF(world.config)
@@ -57,18 +62,18 @@ try:
     for i in bar:
         # for batch_i, batch_data in tqdm(enumerate(lm_loader)):
         if world.sampling_type == SamplingAlgorithms.uniform:
-            bar.set_description('[training]')
+            # bar.set_description('[training]')
             output_information = TrainProcedure.uniform_train(dataset, lm_loader, Recmodel, elbo, Neg_k, i, w)
         elif world.sampling_type == SamplingAlgorithms.sampler:
             epoch_k = dataset.n_users*5
             # epoch_k = dataset.trainDataSize*5
-            bar.set_description(f"[Sample {epoch_k}]")
+            # bar.set_description(f"[Sample {epoch_k}]")
             output_information = TrainProcedure.sampler_train_no_batch(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
         bar.set_description('[SAVE]' + output_information)
         torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
         if globals().get('Varmodel'):
             torch.save(Varmodel.state_dict(), f"../checkpoints/Var-{world.sampling_type.name}.pth.tar")
-        if i%5 == 0:
+        if i%5 == 0 and i != 0:
             # test
             bar.set_description("[TEST]")
             testDict = dataset.getTestDict()
