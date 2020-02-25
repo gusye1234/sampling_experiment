@@ -53,9 +53,11 @@ class LastFM(BasicDataset):
         self.trainData = trainData
         self.testData  = testData
         self.trainUser = np.array(trainData[:][0])
+        self.trainUniqueUsers = np.unique(self.trainUser)
         self.trainItem = np.array(trainData[:][1])
         self.trainDataSize = len(self.trainUser)
         self.testUser  = np.array(testData[:][0])
+        self.testUniqueUsers = np.unique(self.testUser)
         self.testItem  = np.array(testData[:][1])
         print(f"LastFm Sparsity : {(len(self.trainUser) + len(self.testUser))/self.n_users/self.m_items}")
         
@@ -71,7 +73,7 @@ class LastFM(BasicDataset):
         for i in range(self.n_users):
             pos = set(self.allPos[i])
             neg = allItems - pos
-            self.allNeg.append(list(neg))
+            self.allNeg.append(np.array(list(neg)))
         self.__testDict = self.__build_test()
 
     def __build_test(self):
@@ -118,10 +120,7 @@ class LastFM(BasicDataset):
     
     
     def __getitem__(self, index):
-        if self.mode == 0:
-            user = self.trainUser[index]
-        elif self.mode == 1:
-            user = self.testUser[index]
+        user = self.trainUniqueUsers[index]
         # return user_id and the positive items of the user
         return user
     
@@ -133,10 +132,7 @@ class LastFM(BasicDataset):
     
     
     def __len__(self):
-        if self.mode == 0:
-            return len(self.trainUser)
-        else:
-            return len(self.testUser)
+        return len(self.trainUniqueUsers)
         
         
 class MovLens(BasicDataset):
@@ -161,10 +157,12 @@ class MovLens(BasicDataset):
         self.m_items = self.get_n_items()
         #print(self.n_users, self.m_items)
         self.trainUser = np.array(self.trainData['user'])
+        self.trainUniqueUsers = np.unique(self.trainUser)
         self.trainItem = np.array(self.trainData['item'])
         self.trainDataSize = len(self.trainUser)
 
         self.testUser = np.array(self.testData['user'])
+        self.testUniqueUsers = np.unique(self.testUser)
         self.testItem = np.array(self.testData['item'])
         #print(self.testUser)
         self.UserItemNet = csr_matrix((np.ones(len(self.trainUser)), (self.trainUser, self.trainItem)),
@@ -176,7 +174,7 @@ class MovLens(BasicDataset):
         for i in range(self.n_users):
             pos = set(self.allPos[i])
             neg = allItems - pos
-            self.allNeg.append(list(neg))
+            self.allNeg.append(np.array(list(neg)))
         self.__testData = self.__build_test()
         
             
@@ -242,10 +240,7 @@ class MovLens(BasicDataset):
         return negItems
 
     def __getitem__(self, index):
-        if self.mode == 0:
-            user = self.trainUser[index]
-        elif self.mode == 1:
-            user = self.testUser[index]
+        user = self.trainUniqueUsers[index]
         # return user_id and the positive items of the user
         return user
 
@@ -256,7 +251,4 @@ class MovLens(BasicDataset):
         self.mode = self.mode_dict['test']
 
     def __len__(self):
-        if self.mode == 0:
-            return len(self.trainUser)
-        else:
-            return len(self.testUser)
+        return len(self.trainUniqueUsers)

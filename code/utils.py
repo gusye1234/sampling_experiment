@@ -9,7 +9,7 @@ import numpy as np
 from torch import log
 from dataloader import BasicDataset
 from model import VarMF, VarMF_reg
-
+from time import time
 
 
 
@@ -124,7 +124,7 @@ class BCE:
     """
     warp bce loss
     """
-    def __init__(self, rec_model, lr=0.05):
+    def __init__(self, rec_model, lr=0.005):
         self.bce     = nn.BCELoss()
         self.model   = rec_model
         self.opt     = optim.Adam(rec_model.parameters(), lr=lr)
@@ -262,16 +262,29 @@ def UniformSample(users, dataset, k=1):
     dataset : BasicDataset
     allPos   = dataset.getUserPosItems(users)
     allNeg   = dataset.getUserNegItems(users)
-    allItems = list(range(dataset.m_items))
+    # allItems = list(range(dataset.m_items))
     S = []
+    sample_time1 = 0.
+    sample_time2 = 0.
+    total_start = time()
     for i, user in enumerate(users):
+        start = time()
         posForUser = allPos[i]
         # negForUser = dataset.getUserNegItems([user])[0]
         negForUser = allNeg[i]
-        onePos     = np.random.choice(posForUser, size=(1, ))
-        kNeg       = np.random.choice(negForUser, size=(k, ))
+        sample_time2 += time()-start
+        
+        start = time()
+        onePos_index = np.random.randint(0, len(posForUser))
+        onePos     = posForUser[onePos_index:onePos_index+1]
+        # onePos     = np.random.choice(posForUser, size=(1, ))
+        kNeg_index = np.random.randint(0, len(negForUser), size=(k, ))
+        kNeg       = negForUser[kNeg_index]
+        end = time()
+        sample_time1 += end-start
         S.append(np.hstack([onePos, kNeg]))
-    return np.array(S)
+    total = time() - total_start
+    return np.array(S), [total, sample_time1, sample_time2]
         
 # ===================end samplers==========================
 # =========================================================
@@ -350,6 +363,7 @@ def MRRatK(test_data, pred_data, k):
             
     return scores/MRR_n
 
+
 def NDCGatK(test_data, pred_data, k):
     """
     Normalized Discounted Cumulative Gain
@@ -357,20 +371,32 @@ def NDCGatK(test_data, pred_data, k):
     NOTE implementation is slooooow
     """
     pred_rel = []
+    idcg = []
     for i in range(len(test_data)):
         groundTrue = test_data[i]
-        pred = list(map(lambda x: x in groundTrue, pred_data[i][:k]))
+        predictTopK = pred_data[i][:k]
+        pred = list(map(lambda x: x in groundTrue, predictTopK))
         pred = np.array(pred).astype("float")
-        # print(pred)
         pred_rel.append(pred)
+
+
+        if len(groundTrue) < k:
+            coeForIdcg = np.log2(np.arange(2, len(groundTrue)+2))
+        else:
+            coeForIdcg = np.log2(np.arange(2, k + 2))
+
+        idcgi = np.sum(1./coeForIdcg)
+        idcg.append(idcgi)
+        # print(pred)
+
     pred_rel = np.array(pred_rel)
+    idcg = np.array(idcg)
     coefficients = np.log2(np.arange(2, k+2))
     # print(coefficients.shape, pred_rel.shape)
     # print(coefficients)
     assert len(coefficients) == pred_rel.shape[-1]
     
     pred_rel = pred_rel/coefficients
-    idcg = np.sum(1. / np.log2(np.arange(2, k + 2)))
     dcg = np.sum(pred_rel, axis=1)
     ndcg = dcg/idcg
     return np.mean(ndcg)
