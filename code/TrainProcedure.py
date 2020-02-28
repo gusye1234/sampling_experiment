@@ -11,6 +11,77 @@ from time import time
 from tqdm import tqdm
 import model
           
+          
+FAST_SAMPLE_START = 150
+          
+          
+def Alldata_train(dataset, recommend_model, loss_class, epoch, varmodel=None,w=None):
+    Recmodel : model.RecMF = recommend_model
+    loss_class : utils.ELBO
+    Recmodel.train()
+    gamma = torch.ones((dataset.n_users, dataset.m_items))*0.5
+    (epoch_users,
+     epoch_items,
+     epoch_xij,
+     epoch_gamma) = utils.getAllData(dataset, gamma)
+    datalen = len(epoch_users)
+    for (batch_i,
+         (batch_users,
+         batch_items,
+         batch_xijs,
+         batch_gamma)) in enumerate(utils.minibatch(epoch_users,
+                                                   epoch_items,
+                                                   epoch_xij,
+                                                   epoch_gamma, batch_size=world.config['all_batch_size'])):
+        rating = Recmodel(batch_users, batch_items)
+        loss1 = loss_class.stageOne(rating, batch_xijs, batch_gamma)
+        if world.tensorboard:
+            w.add_scalar("Alldata/stageOne", loss1, epoch*(int(datalen/world.config['bpr_batch_size'])+1) + batch_i)
+    return f"[ALL[{datalen}]]"
+    
+def BPR_train(dataset, loader,recommend_model, loss_class, epoch, w=None):
+    Recmodel = recommend_model
+    Recmodel.train()
+    bpr : utils.BPRLoss = loss_class  
+    allusers = list(range(dataset.n_users))        
+    S, sam_time = utils.UniformSample_allpos(allusers, dataset)
+    users = torch.Tensor(S[:,0]).long()
+    posItems = torch.Tensor(S[:,1]).long()
+    negItems = torch.Tensor(S[:,2]).long()
+    users, posItems, negItems = utils.shuffle(users, posItems, negItems)
+    for (batch_i, 
+        (batch_users, 
+         batch_pos, 
+         batch_neg)) in enumerate(utils.minibatch(users, 
+                                                  posItems, 
+                                                  negItems, 
+                                                  batch_size=world.config['bpr_batch_size'])):
+        cri = bpr.stageOne(batch_users, batch_pos, batch_neg)
+        if world.tensorboard:
+            w.add_scalar(f'BPRLoss/BPR', cri, epoch*int(len(users)/world.config['bpr_batch_size']) + batch_i)
+
+    # for batch_i, batch_data in enumerate(loader):
+    #     if batch_i == 0:
+    #         print(batch_data[:5])
+    #     users = batch_data.numpy() # (batch_size, 1)
+    #     # S, sam_time = utils.UniformSample(users, dataset, k=1)
+    #     S, sam_time = utils.UniformSample_allpos(users, dataset)
+        
+    #     assert S.shape[-1] == 3
+    #     print("users => S:", len(users),len(S))
+    #     posItems = S[:, 1]
+    #     negItems = S[:, 2]
+        
+    #     users = torch.Tensor(S[:,0]).long()
+    #     posItems = torch.Tensor(posItems).long()
+    #     negItems = torch.Tensor(negItems).long()
+    #     cri = bpr.stageOne(users, posItems, negItems)
+        
+    #     if world.tensorboard:
+    #         w.add_scalar(f'BPRLoss/BPR', cri, epoch*world.config['total_batch'] + batch_i)
+    return f"[BPR[{cri:.3e}]]"
+    
+
 def uniform_train(dataset, loader,recommend_model, loss_class, Neg_k, epoch, w=None):
     # batch_data = user_batch
     Recmodel = recommend_model
@@ -168,3 +239,120 @@ def Test(dataset, Recmodel, top_k, epoch, w=None):
             w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
             w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
             w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
+            
+
+def sampler_train_GMF(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch, w):
+    # global users_set, items_set
+    sampler : utils.sample_for_basic_GMF_loss
+    dataset : dataloader.BasicDataset
+    recommend_model.train()
+    var_model_reg.train()
+    loss_class : utils.ELBO
+    # 1.
+    # sampling
+    # start = time()
+    #sampler.compute()
+    title = "GMF"
+    epoch_users, epoch_items = sampler.sampleForEpoch(dataset, k=1.5)
+
+    epoch_users, epoch_items = utils.shuffle(epoch_users, epoch_items)
+    epoch_xij = dataset.getUserItemFeedback(epoch_users.cpu().numpy(),
+                                                epoch_items.cpu().numpy()).astype('int')    
+
+    for (batch_i, 
+         (batch_users, 
+          batch_items, 
+          batch_xij)) in enumerate(utils.minibatch(epoch_users, 
+                                                   epoch_items, 
+                                                   epoch_xij)):
+        users = batch_users.long()
+        # print(users.size())
+        items = batch_items.long()
+        xij   = torch.Tensor(batch_xij)
+        gamma = var_model_reg(users, items)
+        rating = recommend_model(users, items)
+
+        loss1  = loss_class.stageOne(rating, xij, gamma)
+
+        rating = recommend_model(users, items)
+        loss2  = loss_class.stageTwo(rating, gamma, xij)
+        # end = time()
+        # print(f"{world.sampling_type } opt time", end-start)
+        if batch_i == world.config['total_batch']:
+            print()
+            print(f'{title:}')
+            # print(batch_users[:10])
+            # print(batch_items[:10])
+            pprint(batch_xij[:6])
+            pprint(rating[:6])
+            pprint(gamma[:6])
+        if world.tensorboard:
+            w.add_scalar(f'SamplerLoss/stageOne', loss1, epoch*(int(len(epoch_users)/world.config['batch_size']) + 1) + batch_i)
+            w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch*(int(len(epoch_users)/world.config['batch_size']) + 1) + batch_i)
+    return f"[{title}]Sparsity{np.sum(epoch_xij)/len(epoch_xij):.3f}"
+    
+    
+def sampler_train_Mixture_GMF(dataset, sampler_GMF, sampler_fast, recommend_model, var_model_reg, loss_class, epoch, w):
+    # global users_set, items_set
+    sampler_GMF : utils.sample_for_basic_GMF_loss
+    sampler_fast : utils.Sample_MF
+    dataset : dataloader.BasicDataset
+    recommend_model.train()
+    var_model_reg.train()
+    loss_class : utils.ELBO
+    # 1.
+    # sampling
+    # start = time()
+    #sampler.compute()
+    title = "GMF"
+    if epoch <= FAST_SAMPLE_START:
+        epoch_users, epoch_items = sampler_GMF.sampleForEpoch(dataset, k=1.5)
+
+        epoch_users, epoch_items = utils.shuffle(epoch_users, epoch_items)
+        epoch_xij = dataset.getUserItemFeedback(epoch_users.cpu().numpy(),
+                                                epoch_items.cpu().numpy()).astype('int')
+        pos_items = np.sum(epoch_xij)
+    else:
+        # TODO
+        epoch_k = dataset.n_users*10
+        title = f"FAST{epoch_k}"
+        sampler_fast.compute()
+        epoch_users, epoch_items = sampler_fast.sampleForEpoch(epoch_k) # epoch_k may be 5*n
+
+        epoch_users, epoch_items = utils.shuffle(epoch_users, epoch_items)
+        epoch_xij = dataset.getUserItemFeedback(epoch_users.cpu().numpy(),
+                                                epoch_items.cpu().numpy()).astype('int')
+        epoch_xij = torch.from_numpy(epoch_xij).float()
+        pos_items = torch.sum(epoch_xij).item()
+
+    for (batch_i, 
+         (batch_users, 
+          batch_items, 
+          batch_xij)) in enumerate(utils.minibatch(epoch_users, 
+                                                   epoch_items, 
+                                                   epoch_xij)):
+        users = batch_users.long()
+        # print(users.size())
+        items = batch_items.long()
+        xij   = torch.Tensor(batch_xij)
+        gamma = var_model_reg(users, items)
+        rating = recommend_model(users, items)
+
+        loss1  = loss_class.stageOne(rating, xij, gamma)
+
+        rating = recommend_model(users, items)
+        loss2  = loss_class.stageTwo(rating, gamma, xij)
+        # end = time()
+        # print(f"{world.sampling_type } opt time", end-start)
+        if batch_i == world.config['total_batch']:
+            print()
+            print(f'{title:}')
+            # print(batch_users[:10])
+            # print(batch_items[:10])
+            pprint(batch_xij[:6])
+            pprint(rating[:6])
+            pprint(gamma[:6])
+        if world.tensorboard:
+            w.add_scalar(f'SamplerLoss/stageOne', loss1, epoch*(int(len(epoch_users)/world.config['batch_size']) + 1) + batch_i)
+            w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch*(int(len(epoch_users)/world.config['batch_size']) + 1) + batch_i)
+    return f"[{title}]Sparsity{pos_items/len(epoch_xij):.3f}"

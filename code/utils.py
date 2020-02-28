@@ -8,9 +8,122 @@ from torch import nn, optim
 import numpy as np
 from torch import log
 from dataloader import BasicDataset
-from model import VarMF, VarMF_reg
+from model import VarMF, VarMF_reg, RecMF
 from time import time
 
+
+
+# class ELBO:
+#     """
+#     class for criterion L(theta, q; x_ij)
+#     hyperparameters: epsilon, eta
+#     details in *SamWalker: Social Recommendation with Informative Sampling Strategy*
+#     NOTE: multiply -1 to original ELBO here.
+#     forward:
+#         rating : shape(batch_size, 1) 
+#         gamma  : shape(batch_size, 1)
+#         xij    : shape(batch_size, 1)
+#     """
+#     eps = torch.Tensor([1e-8]).float()
+#     def __init__(self, config,
+#                  rec_model, var_model, rec_lr=0.003, var_lr=0.003):
+#         rec_model : nn.Module
+#         var_model : nn.Module
+#         self.epsilon = torch.Tensor([config['epsilon']])
+#         self.eta     = torch.Tensor([config['eta']])
+#         self.bce     = nn.BCELoss()
+#         self.optFortheta = optim.Adam(rec_model.parameters(), lr=rec_lr, weight_decay=0.005)
+#         self.optForvar   = optim.Adam(var_model.parameters(), lr=var_lr, weight_decay=0.001)
+        
+#     def stageTwo(self, rating, gamma, xij, pij=None):
+#         """
+#         using the same data as stage one.
+#         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
+#         unbiased_loss = BCE(xij, rating_ij)*len(batch)
+#                         + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
+#                         + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
+#         """
+#         rating: torch.Tensor
+#         gamma: torch.Tensor
+#         xij: torch.Tensor
+
+#         try:
+#             assert rating.size() == gamma.size() == xij.size()
+#             assert len(rating.size()) == 1
+#             if pij is not None:
+#                 assert rating.size() == pij.size()
+#         except ValueError:
+#             print("input error!")
+#             print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
+
+#         gamma = gamma + self.eps
+
+#         same_term = log((1 - self.eta + self.eps) / (1 - gamma + 2 * self.eps))
+#         part_one = xij * log((rating + self.eps) / self.epsilon) \
+#                    + (1 - xij) * log((1 - rating + self.eps) / (1 - self.epsilon)) \
+#                    + log(self.eta / gamma) \
+#                    - same_term
+#         out_one = (part_one * gamma).detach()
+#         part_two = (self.cross(xij, self.epsilon) + same_term)
+#         out_two = part_two.detach()
+#         if pij == None:
+#             part_one = part_one * gamma
+#             part_two = part_two
+#         else:
+#             pij = (pij + self.eps).detach()
+#             part_one = part_one * gamma / pij
+#             part_two = part_two / pij
+
+
+#         out_loss = -(torch.sum(out_one) + torch.sum(out_two))
+
+#         loss1 = torch.sum(part_one)
+#         loss2 = torch.sum(part_two)
+#         loss: torch.Tensor = -(loss1 + loss2)
+
+#         if torch.isnan(loss) or torch.isinf(loss):
+#             print('part_one:', part_one)
+#             print('part_two:', part_two)
+#             print("loss1:", loss1)
+#             print("loss2:", loss2)
+#             raise ValueError("nan or inf")
+#         cri = out_loss.item()
+
+#         self.optForvar.zero_grad()
+#         loss.backward()
+#         self.optForvar.step()
+
+#         return cri
+         
+#     def stageOne(self, rating, xij, gamma=None,pij=None):
+#         """
+#         optimize recommender parameters
+#         same as samwalk, using BCE loss here
+#         p(user_i,item_j) = p(item_j|user_i)p(user_i).And p(user_i) \propto 1
+#         so if we divide loss by pij, then the rij coefficient will be eliminated.
+#         And we get BCE loss here(without `mean`)
+#         """
+#         if pij is not None:
+#             pij = pij + self.eps
+#             loss: torch.Tensor = self.bce(rating, xij)*len(rating)*gamma/pij
+#         else:
+#             if gamma is None:
+#                 raise ValueError("You should input gamma and pij in the same time  \
+#                                  to calculate the loss for recommendation model")
+#             part_one = ELBO.cross(xij, rating)
+#             part_one = part_one*gamma.detach()
+#             loss : torch.Tensor = -torch.sum(part_one)
+#         cri = loss.data
+#         self.optFortheta.zero_grad()
+#         loss.backward()
+#         self.optFortheta.step()
+#         return cri
+        
+#     @staticmethod
+#     def cross(a, b):
+#         a : torch.Tensor
+#         b : torch.Tensor
+#         return a*torch.log(b + ELBO.eps) + (1-a)*torch.log(1-b + ELBO.eps) 
 
 
 class ELBO:
@@ -26,15 +139,63 @@ class ELBO:
     """
     eps = torch.Tensor([1e-8]).float()
     def __init__(self, config,
-                 rec_model, var_model, rec_lr=0.003, var_lr=0.003):
+                 rec_model, var_model, rec_lr=0.005, var_lr=0.001):
         rec_model : nn.Module
         var_model : nn.Module
         self.epsilon = torch.Tensor([config['epsilon']])
         self.eta     = torch.Tensor([config['eta']])
         self.bce     = nn.BCELoss()
-        self.optFortheta = optim.Adam(rec_model.parameters(), lr=rec_lr)
-        self.optForvar   = optim.Adam(var_model.parameters(), lr=var_lr)
-        
+        self.optFortheta = optim.Adam(rec_model.parameters(), lr=rec_lr, weight_decay=0.005)
+        self.optForvar   = optim.Adam(var_model.parameters(), lr=var_lr, weight_decay=0.001)
+
+    def basic_GMF_loss(self, rating, xij):
+        rating : torch.Tensor
+        xij    : torch.Tensor
+        try:
+            assert rating.size() == xij.size()
+            assert len(rating.size()) == 1
+        except ValueError:
+            print("input error!")
+            print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
+        loss: torch.Tensor = self.bce(rating, xij)*len(rating)
+        self.optFortheta.zero_grad()
+        loss.backward()
+        self.optFortheta.step()
+        return loss.data
+
+
+
+
+    def stageOne(self, rating, xij, gamma=None, pij=None):
+        """
+        optimize recommender parameters
+        same as samwalk, using BCE loss here
+        p(user_i,item_j) = p(item_j|user_i)p(user_i).And p(user_i) \propto 1
+        so if we divide loss by pij, then the rij coefficient will be eliminated.
+        And we get BCE loss here(without `mean`)
+        """
+        rating: torch.Tensor
+        gamma: torch.Tensor
+        xij: torch.Tensor
+
+        if pij is None:
+            if gamma is None:
+                raise ValueError("You should input gamma and pij in the same time  \
+                                 to calculate the loss for recommendation model")
+            part_one = self.cross(xij, rating)
+            part_one = part_one * gamma.detach()
+            loss: torch.Tensor = -torch.sum(part_one)
+
+        else:
+            loss: torch.Tensor = self.bce(rating, xij)*len(rating)
+
+        cri = loss.data
+        self.optFortheta.zero_grad()
+        loss.backward()
+        self.optFortheta.step()
+        return cri
+
+
     def stageTwo(self, rating, gamma, xij, pij=None):
         """
         using the same data as stage one.
@@ -43,10 +204,10 @@ class ELBO:
                         + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
                         + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
         """
-        rating : torch.Tensor
-        gamma  : torch.Tensor
-        xij    : torch.Tensor
-        
+        rating: torch.Tensor
+        gamma: torch.Tensor
+        xij: torch.Tensor
+
         try:
             assert rating.size() == gamma.size() == xij.size()
             assert len(rating.size()) == 1
@@ -55,70 +216,53 @@ class ELBO:
         except ValueError:
             print("input error!")
             print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
+
         gamma = gamma + self.eps
-        if pij is None:
-            pij = gamma.detach()
-            
-        same_term   = log(( 1-self.eta + self.eps)/(1-gamma+2*self.eps))
-        part_one    = xij*log( (rating + self.eps)/self.epsilon ) \
-                        + (1-xij)*log( (1-rating + self.eps)/(1-self.epsilon) ) \
-                        + log(self.eta/gamma) \
-                        - same_term
-        out_one  = (part_one*gamma).detach()
-        part_one    = part_one*gamma/pij 
-        
+
+        same_term = log((1 - self.eta + self.eps) / (1 - gamma + 2 * self.eps))
+        part_one = xij * log((rating + self.eps) / self.epsilon) \
+                   + (1 - xij) * log((1 - rating + self.eps) / (1 - self.epsilon)) \
+                   + log(self.eta / gamma) \
+                   - same_term
+        out_one = (part_one * gamma).detach()
         part_two = (self.cross(xij, self.epsilon) + same_term)
-        out_two  = part_two.detach()
-        part_two = part_two/pij
-        
+        out_two = part_two.detach()
+        if pij == None:
+            part_one = part_one * gamma
+            part_two = part_two
+        else:
+            pij = (pij + self.eps).detach()
+            part_one = part_one * gamma / pij
+            part_two = part_two / pij
+
+
         out_loss = -(torch.sum(out_one) + torch.sum(out_two))
-        
-        loss1       = torch.sum(part_one)
-        loss2       = torch.sum(part_two)
-        loss: torch.Tensor = -(loss1+loss2)
-        
+
+        loss1 = torch.sum(part_one)
+        loss2 = torch.sum(part_two)
+        loss: torch.Tensor = -(loss1 + loss2)
+
         if torch.isnan(loss) or torch.isinf(loss):
+            print('part_one:', part_one)
+            print('part_two:', part_two)
             print("loss1:", loss1)
             print("loss2:", loss2)
             raise ValueError("nan or inf")
         cri = out_loss.item()
-        
+
         self.optForvar.zero_grad()
         loss.backward()
         self.optForvar.step()
 
         return cri
-             
-    def stageOne(self, rating, xij, gamma=None,pij=None):
-        """
-        optimize recommender parameters
-        same as samwalk, using BCE loss here
-        p(user_i,item_j) = p(item_j|user_i)p(user_i).And p(user_i) \propto 1
-        so if we divide loss by pij, then the rij coefficient will be eliminated.
-        And we get BCE loss here(without `mean`)
-        """
-        if pij is None:
-            loss: torch.Tensor = self.bce(rating, xij)*len(rating)
-        else:
-            if gamma is None:
-                raise ValueError("You should input gamma and pij in the same time  \
-                                 to calculate the loss for recommendation model")
-            assert pij.size() == gamma.size()
-            pij = pij + self.eps
-            part_one = ELBO.cross(xij, rating)
-            part_one = part_one*gamma/pij
-            loss : torch.Tensor = -torch.sum(part_one)
-        cri = loss.data
-        self.optFortheta.zero_grad()
-        loss.backward()
-        self.optFortheta.step()
-        return cri
+
         
     @staticmethod
     def cross(a, b):
         a : torch.Tensor
         b : torch.Tensor
         return a*torch.log(b + ELBO.eps) + (1-a)*torch.log(1-b + ELBO.eps) 
+
 
 class BCE:
     """
@@ -127,16 +271,38 @@ class BCE:
     def __init__(self, rec_model, lr=0.005):
         self.bce     = nn.BCELoss()
         self.model   = rec_model
-        self.opt     = optim.Adam(rec_model.parameters(), lr=lr)
+        self.opt     = optim.Adam(rec_model.parameters(), lr=lr, weight_decay=0.005)
     
     def stageOne(self, rating, xij):
-        loss = self.bce(rating, xij)
+        loss = self.bce(rating, xij)*len(rating)
         cri = loss.data
         self.opt.zero_grad()
         loss.backward()
         self.opt.step()
         return cri
         
+class BPRLoss:
+    def __init__(self, recmodel, lr=0.003, weight_decay=0.005):
+        recmodel : RecMF
+        self.model = recmodel
+        self.f = nn.Sigmoid()
+        self.opt = optim.Adam(recmodel.parameters(), lr=lr, weight_decay=weight_decay)
+        
+    def stageOne(self, users, pos, neg):
+        pos_scores = self.model.forwardNoSig(users, pos)
+        # print('pos:', pos_scores[:5])
+        neg_scores = self.model.forwardNoSig(users, neg)
+        # print('neg:', neg_scores[:5])
+        
+        bpr  = self.f(pos_scores - neg_scores)
+        bpr  = -torch.log(bpr)
+        loss = torch.sum(bpr)
+        
+        self.opt.zero_grad()
+        loss.backward()
+        self.opt.step()
+        
+        return loss.item()
 
         
 # ==================Samplers=======================
@@ -252,6 +418,45 @@ class Sample_MF:
         # print(users.size(), items.size())
         return users, items
 
+class sample_for_basic_GMF_loss:
+    def __init__(self, k):
+        self.k = k
+
+    def sampleForEpoch(self, dataset, k=3):
+        dataset:BasicDataset
+        allPosItems = dataset.allPos
+        posSamusers = None
+        posSamitems = None
+        for userID, posItems in enumerate(allPosItems):
+            items = torch.tensor(posItems)
+            users = torch.tensor([userID]*len(items)).long()
+            #print(users)
+            if posSamusers is None:
+                posSamusers = users
+                posSamitems = items
+            else:
+                posSamusers = torch.cat([posSamusers, users])
+                posSamitems = torch.cat([posSamitems, items])
+
+        negSamusers = None
+        negSamitems = None
+        itemNumUser = int(dataset.trainDataSize/dataset.n_users*k)
+        allNegItems = dataset.allNeg
+        for userID, negItems in enumerate(allNegItems):
+            items = torch.tensor(np.random.choice(negItems, size=itemNumUser, replace=True))
+            users = torch.tensor([userID]*itemNumUser).long()
+            if negSamusers is None:
+                negSamusers = users
+                negSamitems = items
+            else:
+                negSamusers = torch.cat([negSamusers, users])
+                negSamitems = torch.cat([negSamitems, items])
+
+        #return posSamusers, posSamitems, negSamusers, negSamitems
+        return torch.cat([posSamusers.long(), negSamusers.long()]), torch.cat([posSamitems.long(), negSamitems.long()])
+
+
+
 
 def UniformSample(users, dataset, k=1):
     """
@@ -286,6 +491,68 @@ def UniformSample(users, dataset, k=1):
     total = time() - total_start
     return np.array(S), [total, sample_time1, sample_time2]
         
+
+def UniformSample_allpos(users, dataset, k=4):
+    """
+    uniformsample k negative items and one positive item for one user
+    return:
+        np.array
+    """
+    dataset : BasicDataset
+    allPos   = dataset.getUserPosItems(users)
+    allNeg   = dataset.getUserNegItems(users)
+    # allItems = list(range(dataset.m_items))
+    S = []
+    sample_time1 = 0.
+    sample_time2 = 0.
+    total_start = time()
+    for i, user in enumerate(users):
+        start = time()
+        posForUser = allPos[i]
+        # negForUser = dataset.getUserNegItems([user])[0]
+        negForUser = allNeg[i]
+        sample_time2 += time()-start
+        
+        for positem in posForUser:
+            start = time()
+            # onePos_index = np.random.randint(0, len(posForUser))
+            # onePos     = posForUser[onePos_index:onePos_index+1]
+            # onePos     = np.random.choice(posForUser, size=(1, ))
+            kNeg_index = np.random.randint(0, len(negForUser), size=(k, ))
+            kNeg       = negForUser[kNeg_index]
+            end = time()
+            sample_time1 += end-start
+            for negitemForpos in kNeg:
+                S.append([user, positem, negitemForpos])
+            # S.append(np.hstack([onePos, kNeg]))
+    total = time() - total_start
+    return np.array(S), [total, sample_time1, sample_time2]
+        
+
+def getAllData(dataset, gamma=None):
+    """
+    return all data (n_users X m_items)
+    return:
+        [u, i, x_ui]
+    """
+    # if gamma is not None:
+    #     print(gamma.size())
+    dataset : BasicDataset
+    users = []
+    items = []
+    xijs   = None
+    allPos = dataset.allPos
+    allxijs = np.array(dataset.UserItemNet.todense()).reshape(-1)
+    items = np.tile(np.arange(dataset.m_items), (1, dataset.n_users)).squeeze()
+    users = np.tile(np.arange(dataset.n_users), (dataset.m_items,1)).T.reshape(-1)
+    print(len(allxijs), len(items), len(users))
+    assert len(allxijs) == len(items) == len(users)
+    # for user in range(dataset.n_users):
+    #     users.extend([user]*dataset.m_items)
+    #     items.extend(range(dataset.m_items))
+    if gamma is not None:
+        return torch.Tensor(users).long(), torch.Tensor(items).long(), torch.from_numpy(allxijs).long(), gamma.reshape(-1)
+    return torch.Tensor(users).long(), torch.Tensor(items).long(), torch.from_numpy(allxijs).long()
 # ===================end samplers==========================
 # =========================================================
 
@@ -334,16 +601,16 @@ def recall_precisionATk(test_data, pred_data, k=5):
     k : top-k
     """
     assert len(test_data) == len(pred_data)
-    recall_n    = []
-    precis_n    = []
+    right_items = 0
+    recall_n    = 0
+    precis_n    = len(test_data)*k
     for i in range(len(test_data)):
         groundTrue = test_data[i]
         predictTopK= pred_data[i][:k]
         bingo      = list(filter(lambda x: x in groundTrue, predictTopK))
-        right_items = len(bingo)
-        precis_n.append(float(right_items)/k)
-        recall_n.append(float(right_items)/len(groundTrue))
-    return {'recall': np.mean(recall_n), 'precision': np.mean(precis_n)}
+        right_items+= len(bingo)
+        recall_n   += len(groundTrue)
+    return {'recall': right_items/recall_n, 'precision': right_items/precis_n}
 
 def MRRatK(test_data, pred_data, k):
     """

@@ -26,6 +26,18 @@ class RecMF(nn.Module):
         items_emb = self.embedding_item.weight
         rating = self.f(torch.matmul(users_emb, items_emb.t()))
         return rating
+    def forwardNoSig(self, users, items):
+        try:
+            assert len(users) == len(items)
+        except AssertionError:
+            raise AssertionError(f"(Rec)users and items should be paired, \
+                                 but we got {len(users)} users and {len(items)} items")
+        users_emb = self.embedding_user(users.long())
+        items_emb = self.embedding_item(items.long())
+        inner_pro = torch.mul(users_emb, items_emb)
+        rating    = torch.sum(inner_pro, dim=1)
+        # rating    = self.f(torch.sum(inner_pro, dim=1))
+        return rating
     
     def forward(self, users, items):
         try:
