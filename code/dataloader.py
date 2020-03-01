@@ -27,6 +27,15 @@ class BasicDataset(Dataset):
         raise NotImplementedError
     def getTestDict(self):
         raise NotImplementedError
+    def getSparseGraph(self):
+        """
+        build a graph in torch.sparse.IntTensor.
+        Details in NGCF's matrix form
+        A = 
+            |0,   R|
+            |R^T, 0|
+        """
+        raise NotImplementedError
 
 class LastFM(BasicDataset):
     """
@@ -59,6 +68,7 @@ class LastFM(BasicDataset):
         self.testUser  = np.array(testData[:][0])
         self.testUniqueUsers = np.unique(self.testUser)
         self.testItem  = np.array(testData[:][1])
+        self.Graph = None
         print(f"LastFm Sparsity : {(len(self.trainUser) + len(self.testUser))/self.n_users/self.m_items}")
         
         # (users,users)
@@ -75,6 +85,17 @@ class LastFM(BasicDataset):
             neg = allItems - pos
             self.allNeg.append(np.array(list(neg)))
         self.__testDict = self.__build_test()
+
+    def getSparseGraph(self):
+        if self.Graph is None:
+            user_dim = torch.LongTensor(self.trainUser)
+            item_dim = torch.LongTensor(self.trainItem)
+            first_sub = torch.stack([user_dim, item_dim + self.n_users])
+            second_sub = torch.stack([item_dim+self.n_users, user_dim])
+            index = torch.cat([first_sub, second_sub], dim=1)
+            data = torch.ones(index.size(-1)).int()
+            self.Graph = torch.sparse.IntTensor(index, data, torch.Size([self.n_users+self.m_items, self.n_users+self.m_items]))
+        return self.Graph
 
     def __build_test(self):
         """

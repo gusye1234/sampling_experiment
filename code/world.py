@@ -8,13 +8,13 @@ from enum import Enum
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 class SamplingAlgorithms(Enum):
-  uniform = 1 # it sucks
-  sampler = 2
-  bpr     = 3
-  alldata = 4
-  GMF     = 5
-  Mixture = 6
-
+  uniform   = 1 # it sucks
+  sampler   = 2
+  bpr       = 3
+  alldata   = 4
+  GMF       = 5
+  Mixture   = 6
+  light_gcn = 7
 sampling_type = SamplingAlgorithms.Mixture
 
 # hyperparameters 
