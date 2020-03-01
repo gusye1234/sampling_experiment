@@ -90,11 +90,22 @@ class LastFM(BasicDataset):
         if self.Graph is None:
             user_dim = torch.LongTensor(self.trainUser)
             item_dim = torch.LongTensor(self.trainItem)
+            
             first_sub = torch.stack([user_dim, item_dim + self.n_users])
             second_sub = torch.stack([item_dim+self.n_users, user_dim])
             index = torch.cat([first_sub, second_sub], dim=1)
             data = torch.ones(index.size(-1)).int()
             self.Graph = torch.sparse.IntTensor(index, data, torch.Size([self.n_users+self.m_items, self.n_users+self.m_items]))
+            dense = self.Graph.to_dense()
+            D = torch.sum(dense, dim=1).float()
+            D[D==0.] = 1.
+            D_sqrt = torch.sqrt(D).unsqueeze(dim=0)
+            dense = dense/D_sqrt
+            dense = dense/D_sqrt.t()
+            index = dense.nonzero()
+            data  = dense[dense >= 1e-9]
+            assert len(index) == len(data)
+            self.Graph = torch.sparse.IntTensor(index.t(), data, torch.Size([self.n_users+self.m_items, self.n_users+self.m_items]))
         return self.Graph
 
     def __build_test(self):
