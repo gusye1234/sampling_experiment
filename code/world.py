@@ -15,7 +15,9 @@ class SamplingAlgorithms(Enum):
   GMF       = 5
   Mixture   = 6
   light_gcn = 7
-sampling_type = SamplingAlgorithms.Mixture
+  light_gcn_mixture =8
+
+sampling_type = SamplingAlgorithms.light_gcn_mixture
 
 # hyperparameters 
 config = {}
@@ -28,6 +30,7 @@ config['latent_dim_var'] = 16
 config['batch_size'] = 256
 config['bpr_batch_size'] = 4096
 config['all_batch_size'] = 32768
+config['lightGCN_n_layers']=2
 # ======================
 TRAIN_epochs = 1000
 LOAD = False
@@ -60,6 +63,9 @@ parser.add_argument("--vlr",
 parser.add_argument('--batch',
                     type=int, 
                     default=64)
+parser.add_argument('--sample',
+                    type=str, 
+                    default=sampling_type.name)
 
 
 

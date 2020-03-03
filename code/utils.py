@@ -309,7 +309,6 @@ class BPRLoss:
 # =================================================
 # TODO
 
-
 class Sample_MF:
     """
     implement the sample procedure \n
@@ -329,26 +328,30 @@ class Sample_MF:
         self.model = var_model
         self.__compute = False
         self.__prob = {}
+        #self.save = True
             
     def setK(self,k):
         self.k = k
     
-    def sampleForEpoch(self, epoch_k, notcompute=False):
+    def sampleForEpoch(self, epoch_k, notcompute=True):
         """
         sample pairs for a whole epoch, `epoch_k` samples.
         the strategy changes
         """
+        print(self.__prob, self.__compute)
         if self.__compute:
             pass
         elif notcompute and len(self.__prob) != 0:
             pass
         else:
             self.compute()
+            print('have been computed')
         self.__compute = False
         expected_Users = self.__prob['p(i)']*epoch_k
         Userbase       = expected_Users.int() 
         # int() will floor the numbers, like 1.4 -> 1
         AddOneProbs    = expected_Users - Userbase
+        #print(AddOneProbs)
         AddOnes        = torch.bernoulli(AddOneProbs)
         expected_Users = Userbase + AddOnes
         expected_Users = expected_Users.int()
@@ -363,6 +366,8 @@ class Sample_MF:
             else:
                 Samusers = torch.cat([Samusers, users])
                 Samitems = torch.cat([Samitems, items])
+        self.__compute = False
+        self.__prob.clear()
         return Samusers, Samitems
         
     def sampleForUser(self, user, times=1):
@@ -381,6 +386,9 @@ class Sample_MF:
         with torch.no_grad():
             u_emb : torch.Tensor = self.model.getAllUsersEmbedding() # shape (n,d)
             i_emb : torch.Tensor = self.model.getAllItemsEmbedding() # shape (m,d)
+            #if self.save == True:
+                #np.savetxt('get.txt', np.array(u_emb.detach()))
+                #self.save = False
             # gamma = torch.matmul(u_emb, i_emb.t()) # shape (n,m)
             D_k = torch.sum(i_emb, dim=0) # shape (d)
             S_i = torch.sum(u_emb*D_k, dim=1) # shape (n)
@@ -395,8 +403,11 @@ class Sample_MF:
             self.__prob['D_k']    = D_k
             self.__prob['S_i']    = S_i
             self.__prob['p(i)']   = p_i
+            print('pi', self.__prob['p(i)'])
             self.__prob['p(k|i)'] = p_ki
+            print('pik', self.__prob['p(k|i)'])
             self.__prob['p(j|k)'] = p_jk
+            print('pkj', self.__prob['p(j|k)'])
     
     def sample(self, notcompute=False):
         """

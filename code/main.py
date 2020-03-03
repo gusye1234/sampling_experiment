@@ -80,7 +80,22 @@ elif world.sampling_type == SamplingAlgorithms.Mixture:
     if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-Mixture.pth.tar')))
         Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-Mixture.pth.tar')))
+elif world.sampling_type == SamplingAlgorithms.light_gcn:
+    print('sampling_LGN')
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN(world.config, dataset)
+    elbo = utils.ELBO(world.config,
+                      rec_model = Recmodel,var_model=Varmodel)
+    sampler = utils.Sample_MF(k=1, var_model=Varmodel)
 
+elif world.sampling_type == SamplingAlgorithms.light_gcn_mixture:
+    print('sampling_LGN_mixture')
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN(world.config, dataset)
+    elbo = utils.ELBO(world.config,
+                      rec_model = Recmodel,var_model=Varmodel)
+    sampler1 = utils.sample_for_basic_GMF_loss(k=3)
+    sampler2 = utils.Sample_MF(k=1, var_model=Varmodel)
 
 # train
 Neg_k = 3
@@ -100,8 +115,6 @@ try:
             output_information = TrainProcedure.uniform_train(dataset, lm_loader, Recmodel, elbo, Neg_k, i, w)
         elif world.sampling_type == SamplingAlgorithms.sampler:
             epoch_k = dataset.n_users*5
-            # epoch_k = dataset.trainDataSize*5
-            # bar.set_description(f"[Sample {epoch_k}]")
             output_information = TrainProcedure.sampler_train_no_batch(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
         elif world.sampling_type == SamplingAlgorithms.bpr:
             output_information = TrainProcedure.BPR_train(dataset, lm_loader, Recmodel, bpr, i, w)
@@ -110,7 +123,14 @@ try:
         elif world.sampling_type == SamplingAlgorithms.GMF:
             output_information = TrainProcedure.sampler_train_GMF(dataset, sampler, Recmodel, Varmodel, elbo, i, w)
         elif world.sampling_type == SamplingAlgorithms.Mixture:
-            output_information = TrainProcedure.sampler_train_Mixture_GMF(dataset, sampler_GMF, sampler_fast, Recmodel, Varmodel, elbo, i, w)
+            output_information = TrainProcedure.sampler_train_Mixture_GMF_nobatch(dataset, sampler_GMF, sampler_fast, Recmodel, Varmodel, elbo, i, w)
+        elif world.sampling_type == SamplingAlgorithms.light_gcn:
+            epoch_k = dataset.trainDataSize*5
+            output_information = TrainProcedure.sampler_train_no_batch_LGN(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
+            print('over train and follow bar')
+        elif world.sampling_type == SamplingAlgorithms.light_gcn_mixture:
+            epoch_k = 166972
+            output_information = TrainProcedure.sampler_train_no_batch_LGN_mixture(dataset, sampler1, sampler2, Recmodel, Varmodel, elbo, epoch_k, i, w)
         
         bar.set_description(output_information)
         torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
