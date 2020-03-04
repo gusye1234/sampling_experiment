@@ -17,7 +17,7 @@ class SamplingAlgorithms(Enum):
   light_gcn = 7
   light_gcn_mixture =8
 
-sampling_type = SamplingAlgorithms.light_gcn_mixture
+sampling_type = SamplingAlgorithms.Mixture
 
 # hyperparameters 
 config = {}

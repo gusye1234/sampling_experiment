@@ -59,26 +59,6 @@ def BPR_train(dataset, loader,recommend_model, loss_class, epoch, w=None):
         cri = bpr.stageOne(batch_users, batch_pos, batch_neg)
         if world.tensorboard:
             w.add_scalar(f'BPRLoss/BPR', cri, epoch*int(len(users)/world.config['bpr_batch_size']) + batch_i)
-
-    # for batch_i, batch_data in enumerate(loader):
-    #     if batch_i == 0:
-    #         print(batch_data[:5])
-    #     users = batch_data.numpy() # (batch_size, 1)
-    #     # S, sam_time = utils.UniformSample(users, dataset, k=1)
-    #     S, sam_time = utils.UniformSample_allpos(users, dataset)
-        
-    #     assert S.shape[-1] == 3
-    #     print("users => S:", len(users),len(S))
-    #     posItems = S[:, 1]
-    #     negItems = S[:, 2]
-        
-    #     users = torch.Tensor(S[:,0]).long()
-    #     posItems = torch.Tensor(posItems).long()
-    #     negItems = torch.Tensor(negItems).long()
-    #     cri = bpr.stageOne(users, posItems, negItems)
-        
-    #     if world.tensorboard:
-    #         w.add_scalar(f'BPRLoss/BPR', cri, epoch*world.config['total_batch'] + batch_i)
     return f"[BPR[{cri:.3e}]]"
     
 
