@@ -43,36 +43,35 @@ class LastFM(BasicDataset):
     Incldue graph information
     LastFM dataset
     """
-    def __init__(self, path="../data/samwalk_data"):
+    def __init__(self, path="../data/lastfmi"):
         # train or test
         self.mode_dict = {'train':0, "test":1}
         self.mode    = self.mode_dict['train']
         self.n_users = 1892
         self.m_items = 4489
-        trainData = pd.read_table(join(path, 'data1.txt'), header=None)
-        # print(trainData.head())
-        testData  = pd.read_table(join(path, 'test1.txt'), header=None)
-        # print(testData.head())
-        trustNet  = pd.read_table(join(path, 'trustnetwork.txt'), header=None).to_numpy()
-        # print(trustNet[:5])
-        trustNet -= 1
+        # trainData = pd.read_table(join(path, 'train.txt'), header=None)
+        trainData = np.loadtxt(join(path, 'train.txt'))
+        # testData  = pd.read_table(join(path, 'test.txt'), header=None)
+        testData  = np.loadtxt(join(path, 'test.txt'))
         trainData-= 1
         testData -= 1
-        self.trustNet  = trustNet
         self.trainData = trainData
         self.testData  = testData
-        self.trainUser = np.array(trainData[:][0])
+        self.trainUser = trainData[:, 0]
         self.trainUniqueUsers = np.unique(self.trainUser)
-        self.trainItem = np.array(trainData[:][1])
+        print(len(self.trainUniqueUsers))
+        self.trainItem = trainData[:,1]
+        print(len(np.unique(self.trainItem)))
+
         self.trainDataSize = len(self.trainUser)
-        self.testUser  = np.array(testData[:][0])
+        self.testUser  = testData[:, 0]
         self.testUniqueUsers = np.unique(self.testUser)
-        self.testItem  = np.array(testData[:][1])
+        self.testItem  = testData[:,1]
         self.Graph = None
         print(f"LastFm Sparsity : {(len(self.trainUser) + len(self.testUser))/self.n_users/self.m_items}")
         
         # (users,users)
-        self.socialNet    = csr_matrix((np.ones(len(trustNet)), (trustNet[:,0], trustNet[:,1]) ), shape=(self.n_users,self.n_users))
+        # self.socialNet    = csr_matrix((np.ones(len(trustNet)), (trustNet[:,0], trustNet[:,1]) ), shape=(self.n_users,self.n_users))
         # (users,items), bipartite graph
         self.UserItemNet  = csr_matrix((np.ones(len(self.trainUser)), (self.trainUser, self.trainItem) ), shape=(self.n_users,self.m_items)) 
         
