@@ -10,8 +10,8 @@ else:
     alldata = np.loadtxt("../data/lastfmi/alltrain.txt")
     alldata = pd.DataFrame(alldata)
 
-print(alldata.head())
-print(alldata.iloc[:10,0])
+# print(alldata.head())
+# print(alldata.iloc[:10,0])
 data = list(alldata.groupby(alldata.iloc[:,0]))
 data = list(map(lambda x: (x[0], x[1].to_numpy()[:,1]), data))
 item_count = alldata.iloc[:, 1].value_counts()
