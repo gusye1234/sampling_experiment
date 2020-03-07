@@ -22,6 +22,7 @@ world.config['num_items'] = dataset.m_items
 
 print('===========config================')
 pprint(world.config)
+print("cores for test:", world.CORES)
 print(world.comment)
 print("tensorboard:", world.tensorboard)
 print("LOAD:", world.LOAD)
@@ -136,7 +137,7 @@ try:
         torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
         if globals().get('Varmodel'):
             torch.save(Varmodel.state_dict(), f"../checkpoints/Var-{world.sampling_type.name}.pth.tar")
-        if i%5 == 0 and i != 0:
+        if i%5 == 0:
             # test
             bar.set_description("[TEST]")
             testDict = dataset.getTestDict()

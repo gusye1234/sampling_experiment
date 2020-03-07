@@ -10,8 +10,9 @@ from pprint import pprint
 from time import time
 from tqdm import tqdm
 import model
+import multiprocessing
           
-          
+CORES = world.CORES
 FAST_SAMPLE_START = 150
           
           
@@ -188,37 +189,37 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
     return f"Sparsity {np.sum(epoch_xij)/len(epoch_xij):.3f}"
 
 
-def Test(dataset, Recmodel, top_k, epoch, w=None):
-    dataset : utils.BasicDataset
-    testDict : dict = dataset.getTestDict()
-    Recmodel : model.RecMF
-    with torch.no_grad():
-        Recmodel.eval()
-        users = torch.Tensor(list(testDict.keys()))
-        GroundTrue = [testDict[user] for user in users.numpy()]
-        rating = Recmodel.getUsersRating(users)
-        # exclude positive train data
-        allPos = dataset.getUserPosItems(users)
-        exclude_index = []
-        exclude_items = []
-        for range_i, items in enumerate(allPos):
-            exclude_index.extend([range_i]*len(items))
-            exclude_items.extend(items)
-        rating[exclude_index, exclude_items] = 0.
-        # assert torch.all(rating >= 0.)
-        # assert torch.all(rating <= 1.)
-        # end excluding
-        _, top_items = torch.topk(rating, top_k)
-        top_items = top_items.cpu().numpy()
-        metrics = utils.recall_precisionATk(GroundTrue, top_items, top_k)
-        metrics['mrr'] = utils.MRRatK(GroundTrue, top_items, top_k)
-        metrics['ndcg'] = utils.NDCGatK(GroundTrue, top_items, top_k)
-        # pprint(metrics)
-        if world.tensorboard:
-            w.add_scalar(f'Test/Recall@{top_k}', metrics['recall'], epoch)
-            w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
-            w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
-            w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
+# def Test(dataset, Recmodel, top_k, epoch, w=None):
+#     dataset : utils.BasicDataset
+#     testDict : dict = dataset.getTestDict()
+#     Recmodel : model.RecMF
+#     with torch.no_grad():
+#         Recmodel.eval()
+#         users = torch.Tensor(list(testDict.keys()))
+#         GroundTrue = [testDict[user] for user in users.numpy()]
+#         rating = Recmodel.getUsersRating(users)
+#         # exclude positive train data
+#         allPos = dataset.getUserPosItems(users)
+#         exclude_index = []
+#         exclude_items = []
+#         for range_i, items in enumerate(allPos):
+#             exclude_index.extend([range_i]*len(items))
+#             exclude_items.extend(items)
+#         rating[exclude_index, exclude_items] = 0.
+#         # assert torch.all(rating >= 0.)
+#         # assert torch.all(rating <= 1.)
+#         # end excluding
+#         _, top_items = torch.topk(rating, top_k)
+#         top_items = top_items.cpu().numpy()
+#         metrics = utils.recall_precisionATk(GroundTrue, top_items, top_k)
+#         metrics['mrr'] = utils.MRRatK(GroundTrue, top_items, top_k)
+#         metrics['ndcg'] = utils.NDCGatK(GroundTrue, top_items, top_k)
+#         # pprint(metrics)
+#         if world.tensorboard:
+#             w.add_scalar(f'Test/Recall@{top_k}', metrics['recall'], epoch)
+#             w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
+#             w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
+#             w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
             
 
 def sampler_train_GMF(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch, w):
@@ -602,3 +603,85 @@ def sampler_train_no_batch_LGN_mixture(dataset, sampler1, sampler2, recommend_mo
 
         print('over one epoch!!!!!')
         return f"Sparsity {(torch.sum(epoch_xij) / len(epoch_xij)).item():.3f}"
+
+
+def test_one_batch(X):
+    sorted_items = X[0].numpy()
+    groundTrue = X[1]
+    r = utils.getLabel(groundTrue, sorted_items)
+    print(r)
+    pre, recall, ndcg = [], [], []
+    for k in world.topks:
+        # ret = utils.recall_precisionATk(groundTrue, sorted_items, k)
+        ret = utils.RecallPrecision_ATk(groundTrue, r, k)
+        pre.append(ret['precision'])
+        recall.append(ret['recall'])
+        # ndcg.append(utils.NDCGatK(groundTrue, sorted_items, k))
+        ndcg.append(utils.NDCGatK_r(r, k))
+    return {'recall':np.array(recall), 
+            'precision':np.array(pre), 
+            'ndcg':np.array(ndcg)}
+        
+            
+def Test(dataset, Recmodel, top_k, epoch, w=None):
+    u_batch_size = world.config['test_u_batch_size']
+    dataset : utils.BasicDataset
+    testDict : dict = dataset.getTestDict()
+    Recmodel : model.LightGCN
+    # eval mode with no dropout
+    Recmodel = Recmodel.eval()
+    max_K = max(world.topks)
+    pool = multiprocessing.Pool(CORES)
+    results = {'precision': np.zeros(len(world.topks)), 
+              'recall': np.zeros(len(world.topks)), 
+              'ndcg': np.zeros(len(world.topks))}
+    with torch.no_grad():
+        users = list(testDict.keys())
+        try:
+            assert u_batch_size <= len(users)/10
+        except AssertionError:
+            print(f"test_u_batch_size is too big for this dataset, try a small one {len(users)//10}")
+        users_list = []
+        rating_list = []
+        groundTrue_list = []
+        # ratings = []
+        total_batch = len(users)//u_batch_size + 1
+        for batch_users in utils.minibatch(users, batch_size=u_batch_size):
+            allPos = dataset.getUserPosItems(batch_users)
+            groundTrue = [testDict[u] for u in batch_users]
+            batch_users_gpu = torch.Tensor(batch_users).long()
+            batch_users_gpu = batch_users_gpu.to(world.device)
+        
+            rating = Recmodel.getUsersRating(batch_users_gpu)
+            rating = rating.cpu()
+            exclude_index = []
+            exclude_items = []
+            for range_i, items in enumerate(allPos):
+                exclude_index.extend([range_i]*len(items))
+                exclude_items.extend(items)
+            rating[exclude_index, exclude_items] = -1e5
+            _, rating_K = torch.topk(rating, k=max_K)
+            del rating      
+            users_list.append(batch_users)
+            rating_list.append(rating_K) 
+            groundTrue_list.append(groundTrue)
+        assert total_batch == len(users_list)
+        X = zip(rating_list, groundTrue_list)
+        pre_results = pool.map(test_one_batch, X)
+        for result in pre_results:
+            results['recall'] += result['recall'] / total_batch
+            results['precision'] += result['precision'] / total_batch
+            results['ndcg'] += result['ndcg'] / total_batch
+        if world.tensorboard:
+            w.add_scalars(f'Test/Recall@{world.topks}', 
+                         {str(world.topks[i]): results['recall'][i] for i in range(len(world.topks))}, epoch)
+            w.add_scalars(f'Test/Precision@{world.topks}',
+                         {str(world.topks[i]): results['precision'][i] for i in range(len(world.topks))}, epoch)
+            w.add_scalars(f'Test/NDCG@{world.topks}',
+                         {str(world.topks[i]): results['ndcg'][i] for i in range(len(world.topks))}, epoch)
+        pool.close()
+        return results
+        
+    
+            
+            

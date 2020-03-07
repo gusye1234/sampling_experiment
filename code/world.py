@@ -4,6 +4,7 @@ Store global parameters here
 import torch
 import os
 from enum import Enum
+import multiprocessing
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -31,14 +32,18 @@ config['batch_size'] = 256
 config['bpr_batch_size'] = 4096
 config['all_batch_size'] = 32768
 config['lightGCN_n_layers']=2
+config['test_u_batch_size'] = 100
 # ======================
 TRAIN_epochs = 1000
-LOAD = False
+LOAD = True
 PATH = '../checkpoints'
 top_k = 5
+topks = [5,10,20,40]
 comment = f"MF_{sampling_type.name}"
 tensorboard = True
 GPU = torch.cuda.is_available()
+device = torch.device('cuda' if GPU else "cpu")
+CORES = multiprocessing.cpu_count() // 2
 
 
 # let pandas shut up
