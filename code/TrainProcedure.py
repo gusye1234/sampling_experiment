@@ -412,7 +412,7 @@ def sampler_train_Mixture_GMF_nobatch(dataset, sampler_GMF, sampler_fast, recomm
         gamma_writed = gamma.detach().numpy()
         xij_writed   = xij.detach().numpy()
         writed   = np.vstack([gamma_writed, xij_writed]).T
-        np.savetxt("gamma.txt", writed)
+        np.savetxt("gamma_mf.txt", writed)
         
         rating = recommend_model(users, items)
         loss1  = loss_class.stageOne(rating, xij, gamma)
@@ -585,7 +585,7 @@ def sampler_train_no_batch_LGN_mixture(dataset, sampler1, sampler2, recommend_mo
         gamma_writed = gamma.detach().numpy()
         xij_writed   = epoch_xij.detach().numpy()
         writed   = np.vstack([gamma_writed, xij_writed]).T
-        np.savetxt("gamma.txt", writed)
+        np.savetxt("gamma_lgn.txt", writed)
 
         rating = recommend_model(epoch_users, epoch_items)
 
