@@ -8,7 +8,7 @@ from torch import nn, optim
 import numpy as np
 from torch import log
 from dataloader import BasicDataset
-from model import VarMF, VarMF_reg, RecMF
+from model import VarMF_reg, RecMF
 from time import time
 
 
@@ -76,13 +76,8 @@ class ELBO:
 
         else:
             pij = (pij + self.eps).detach()
-            #print('pij',pij)
-            #print('gamma', gamma)
-            #print('xij', xij)
-            #print('rating', rating)
             part_one = self.cross(xij, rating)
             part_one = part_one * gamma.detach()/pij
-            #print('partone_size', part_one)
             loss: torch.Tensor = -torch.sum(part_one)
 
 
@@ -161,47 +156,8 @@ class ELBO:
         return a*torch.log(b + ELBO.eps) + (1-a)*torch.log(1-b + ELBO.eps) 
 
 
-class BCE:
-    """
-    warp bce loss
-    """
-    def __init__(self, rec_model, lr=0.005):
-        self.bce     = nn.BCELoss()
-        self.model   = rec_model
-        self.opt     = optim.Adam(rec_model.parameters(), lr=lr, weight_decay=0.005)
-    
-    def stageOne(self, rating, xij):
-        loss = self.bce(rating, xij)*len(rating)
-        cri = loss.data
-        self.opt.zero_grad()
-        loss.backward()
-        self.opt.step()
-        return cri
-        
-class BPRLoss:
-    def __init__(self, recmodel, lr=0.003, weight_decay=0.005):
-        recmodel : RecMF
-        self.model = recmodel
-        self.f = nn.Sigmoid()
-        self.opt = optim.Adam(recmodel.parameters(), lr=lr, weight_decay=weight_decay)
-        
-    def stageOne(self, users, pos, neg):
-        pos_scores = self.model.forwardNoSig(users, pos)
-        # print('pos:', pos_scores[:5])
-        neg_scores = self.model.forwardNoSig(users, neg)
-        # print('neg:', neg_scores[:5])
-        
-        bpr  = self.f(pos_scores - neg_scores)
-        bpr  = -torch.log(bpr)
-        loss = torch.sum(bpr)
-        
-        self.opt.zero_grad()
-        loss.backward()
-        self.opt.step()
-        
-        return loss.item()
 
-        
+
 # ==================Samplers=======================
 # =================================================
 # TODO

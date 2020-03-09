@@ -19,7 +19,7 @@ def parse_args():
                         help="weight decay for rec model")
     parser.add_argument('--layer', type=int,default=2,
                         help="the layer num of lightGCN")
-    parser.add_argument('--dropout', type=bool,default=True,
+    parser.add_argument('--dropout', type=bool,default=False,
                         help="using the dropout or not")
     parser.add_argument('--keepprob', type=float,default=0.6,
                         help="the batch size for bpr loss training procedure")
@@ -31,6 +31,6 @@ def parse_args():
                         help="enable tensorboard")
     parser.add_argument('--comment', type=str,default="lgn")
     parser.add_argument('--load', type=bool,default=False)
-    parser.add_argument('--epochs', type=int,default=1000)
+    parser.add_argument('--epochs', type=int,default=100)
     
     return parser.parse_args()

@@ -9,24 +9,21 @@ from parse import parse_args
 
 args = parse_args()
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-
 class SamplingAlgorithms(Enum):
-  uniform   = 1 # it sucks
-  sampler   = 2
-  bpr       = 3
-  alldata   = 4
-  GMF       = 5
-  Mixture   = 6
-  light_gcn = 7
-  light_gcn_mixture =8
-  Sample_positive_all = 9
-  Alldata_train_ELBO = 10
-sampling_type = SamplingAlgorithms.Alldata_train_ELBO
+  Alldata_train_set_gamma_cross_entrophy   = 1 # it sucks
+  all_data_MF_MF   = 2
+  all_data_LGN_MF       = 3
+  all_data_MFxij_MF   = 4
+  all_data_LGNxij_MF       = 5
+  Sample_all_dataset = 6
+  Sample_positive_all = 7
+sampling_type = SamplingAlgorithms.all_data_MF_MF
+
+
 
 # hyperparameters 
 config = {}
-config['alpha'] = 100
-config['beta']  = 20
+
 config['eta']   = 0.5
 config['epsilon'] = 0.001
 config['keep_prob'] = args.keepprob
@@ -41,7 +38,6 @@ config['var_weight_decay'] = args.vardecay
 config['lightGCN_n_layers']= args.layer
 # ===============================
 config['batch_size'] = 32768
-config['bpr_batch_size'] = 4096
 config['all_batch_size'] = 32768
 config['test_u_batch_size'] = 100
 config['xij_dim'] = 8
@@ -51,7 +47,7 @@ TRAIN_epochs = 1000
 LOAD = True
 PATH = '../checkpoints'
 top_k = 5
-topks = [5,10]
+topks = 5
 comment = f"MF_{sampling_type.name}"
 tensorboard = True
 GPU = torch.cuda.is_available()

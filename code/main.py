@@ -31,88 +31,82 @@ print(world.sampling_type)
 print('===========end===================')
 
 # initialize models
-if world.sampling_type == SamplingAlgorithms.uniform:
+if world.sampling_type == SamplingAlgorithms.Alldata_train_set_gamma_cross_entrophy:
     Recmodel = model.RecMF(world.config)
-    elbo     = utils.BCE(Recmodel)
+    Varmodel = model.VarMF_reg(world.config)
+    elbo = utils.ELBO(world.config,
+                    rec_model=Recmodel,
+                    var_model=Varmodel)
+    #varmodel is not useful
     if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-uniform.pth.tar')))
         Recmodel.train()
 
-elif world.sampling_type == SamplingAlgorithms.sampler:
+elif world.sampling_type == SamplingAlgorithms.all_data_MF_MF:
+    print('all_data_MF_MF train')
     Recmodel = model.RecMF(world.config)
-    # Varmodel = model.VarMF(world.config)
     Varmodel = model.VarMF_reg(world.config)
-    # register ELBO loss
+    elbo = utils.ELBO(world.config,
+                      rec_model=Recmodel,
+                      var_model=Varmodel)
+
+
+elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
+    print('all_data_LGN_MF train')
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN(world.config, dataset)
+    elbo = utils.ELBO(world.config,
+                      rec_model=Recmodel,
+                      var_model=Varmodel)
+    if world.LOAD:
+        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-all_data_LGN_MF.pth.tar')))
+        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-all_data_LGN_MF.pth.tar')))
+
+elif world.sampling_type == SamplingAlgorithms.all_data_MFxij_MF:
+    print('all_data_MFxij_MF train')
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.VarMF_xij(world.config)
+    elbo = utils.ELBO(world.config,
+                      rec_model=Recmodel,
+                      var_model=Varmodel)
+    if world.LOAD:
+        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-all_data_MFxij_MF.pth.tar')))
+        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-all_data_MFxij_MF.pth.tar')))
+
+elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF:
+    print('all_data_LGNxij_MF train')
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN_xij(world.config, dataset)
+    elbo = utils.ELBO(world.config,
+                      rec_model=Recmodel,
+                      var_model=Varmodel)
+    if world.LOAD:
+        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-all_data_LGNxij_MF.pth.tar')))
+        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-all_data_LGNxij_MF.pth.tar')))
+
+elif world.sampling_type == SamplingAlgorithms.Sample_all_dataset:
+    print('Sample_all_dataset train')
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN_xij(world.config, dataset)
     elbo = utils.ELBO(world.config, 
                     rec_model=Recmodel, 
                     var_model=Varmodel)
     sampler = utils.Sample_MF(k=1, var_model=Varmodel) 
-    if word.LOAD:
-        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-sampler.pth.tar')))
-        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-sampler.pth.tar')))
-
-elif world.sampling_type == SamplingAlgorithms.bpr:
-    Recmodel = model.RecMF(world.config)
-    bpr = utils.BPRLoss(Recmodel)
     if world.LOAD:
-        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-bpr.pth.tar')))
+        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-Sample_all_dataset.pth.tar')))
+        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-Sample_all_dataset.pth.tar')))
 
-elif world.sampling_type == SamplingAlgorithms.alldata:
-    Recmodel = model.RecMF(world.config)
-    Varmodel = model.VarMF_reg(world.config)
-    elbo = utils.ELBO(world.config,
-                      rec_model=Recmodel, 
-                      var_model=Varmodel)
-
-elif world.sampling_type == SamplingAlgorithms.GMF:
-    Recmodel = model.RecMF(world.config)
-    Varmodel = model.VarMF_reg(world.config)
-    elbo = utils.ELBO(world.config,
-                      rec_model = Recmodel,var_model=Varmodel)
-    sampler = utils.sample_for_basic_GMF_loss(k=1.5)
-
-elif world.sampling_type == SamplingAlgorithms.Mixture:
-    Recmodel = model.RecMF(world.config)
-    Varmodel = model.VarMF_reg(world.config)
-    elbo = utils.ELBO(world.config,
-                      rec_model = Recmodel,var_model=Varmodel)
-    sampler_GMF = utils.sample_for_basic_GMF_loss(k=1.5)
-    sampler_fast = utils.Sample_MF(k=1, var_model=Varmodel) # k doesn't matter
-    if world.LOAD:
-        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-Mixture.pth.tar')))
-        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-Mixture.pth.tar')))
-elif world.sampling_type == SamplingAlgorithms.light_gcn:
-    print('sampling_LGN')
-    Recmodel = model.RecMF(world.config)
-    Varmodel = model.LightGCN(world.config, dataset)
-    elbo = utils.ELBO(world.config,
-                      rec_model = Recmodel,var_model=Varmodel)
-    sampler = utils.Sample_MF(k=1, var_model=Varmodel)
-
-elif world.sampling_type == SamplingAlgorithms.light_gcn_mixture:
-    print('sampling_LGN_mixture')
-    Recmodel = model.RecMF(world.config)
-    Varmodel = model.LightGCN(world.config, dataset)
-    elbo = utils.ELBO(world.config,
-                      rec_model = Recmodel,var_model=Varmodel)
-    sampler1 = utils.sample_for_basic_GMF_loss(k=3)
-    sampler2 = utils.Sample_MF(k=1, var_model=Varmodel)
-elif world.sampling_type == SamplingAlgorithms.Alldata_train_ELBO:
-    print('Alldata_train_ELBO train')
-    Recmodel = model.RecMF(world.config)
-    Varmodel = model.LightGCN(world.config, dataset)
-    sampler_gamma_save = utils.sample_for_basic_GMF_loss(k=1)
-    elbo = utils.ELBO(world.config,
-                      rec_model=Recmodel,
-                      var_model=Varmodel)
 elif world.sampling_type == SamplingAlgorithms.Sample_positive_all:
-    print('Sample_positive_all')
+    print('Sample_positive_all train')
     Recmodel = model.RecMF(world.config)
-    Varmodel = model.LightGCN(world.config, dataset)
+    Varmodel = model.LightGCN_xij(world.config, dataset)
     elbo = utils.ELBO(world.config,
-                      rec_model=Recmodel, var_model=Varmodel)
+                    rec_model=Recmodel,
+                    var_model=Varmodel)
     sampler = utils.Sample_positive_all(dataset, Varmodel)
-
+    if world.LOAD:
+        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-Sample_all_dataset.pth.tar')))
+        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-Sample_all_dataset.pth.tar')))
 
 # train
 Neg_k = 3
@@ -127,62 +121,33 @@ try:
     bar = tqdm(range(world.TRAIN_epochs))
     for i in bar:
         # for batch_i, batch_data in tqdm(enumerate(lm_loader)):
-        if world.sampling_type == SamplingAlgorithms.uniform:
+        if world.sampling_type == SamplingAlgorithms.Alldata_train_set_gamma_cross_entrophy:
             # bar.set_description('[training]')
-            output_information = TrainProcedure.uniform_train(dataset, lm_loader, Recmodel, elbo, Neg_k, i, w)
-        elif world.sampling_type == SamplingAlgorithms.sampler:
-            epoch_k = dataset.n_users*5
-            output_information = TrainProcedure.sampler_train_no_batch(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
-        elif world.sampling_type == SamplingAlgorithms.bpr:
-            output_information = TrainProcedure.BPR_train(dataset, lm_loader, Recmodel, bpr, i, w)
-        elif world.sampling_type == SamplingAlgorithms.alldata:
-            output_information = TrainProcedure.Alldata_train(dataset, Recmodel, elbo, i, w=w)
-        elif world.sampling_type == SamplingAlgorithms.GMF:
-            output_information = TrainProcedure.sampler_train_GMF(dataset, sampler, Recmodel, Varmodel, elbo, i, w)
-        elif world.sampling_type == SamplingAlgorithms.Mixture:
-            output_information = TrainProcedure.sampler_train_Mixture_GMF_nobatch(dataset, sampler_GMF, sampler_fast, Recmodel, Varmodel, elbo, i, w)
-        elif world.sampling_type == SamplingAlgorithms.light_gcn:
-            epoch_k = dataset.trainDataSize*5
-            output_information = TrainProcedure.sampler_train_no_batch_LGN(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
-            print('over train and follow bar')
-        elif world.sampling_type == SamplingAlgorithms.light_gcn_mixture:
-            epoch_k = 166972
-            output_information = TrainProcedure.sampler_train_no_batch_LGN_mixture(dataset, sampler1, sampler2, Recmodel, Varmodel, elbo, epoch_k, i, w)
+            output_information = TrainProcedure.Alldata_train_set_gamma_cross_entrophy(dataset, Recmodel, elbo, i, w)
+        elif world.sampling_type == SamplingAlgorithms.all_data_MF_MF:
+            output_information = TrainProcedure.all_data_MF_MF(dataset, Recmodel, Varmodel, elbo, i, w)
+        elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
+            output_information = TrainProcedure.all_data_LGN_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
+
+        elif world.sampling_type == SamplingAlgorithms.all_data_MFxij_MF:
+            output_information = TrainProcedure.all_data_MFxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
+
+        elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF:
+            output_information = TrainProcedure.all_data_LGNxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
+
+
+        elif world.sampling_type == SamplingAlgorithms.Sample_all_dataset:
+            output_information = TrainProcedure.sampler_train(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i,w)
         elif world.sampling_type == SamplingAlgorithms.Sample_positive_all:
             epoch_k = dataset.trainDataSize * 4
             output_information = TrainProcedure.Sample_positive_all_LGN(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
-            print('end one epoch spa')
-        elif world.sampling_type == SamplingAlgorithms.Alldata_train_ELBO:
-            output_information = TrainProcedure.Alldata_train_ELBO(dataset, Recmodel, Varmodel, elbo, i, w=w)
-            if i == 15:
-                print('save_gamma1_xij_ok')
-                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=1)
-                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
-                gamma = Varmodel(users, items)
-                np.savetxt('gamma1.txt', np.array(gamma.data))
-                np.savetxt('xij1.txt', np.array(xij))
-                print('save_ok')
-            elif i == 25:
-                print('save_gamma2_xij_ok')
-                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=1)
-                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
-                gamma = Varmodel(users, items)
-                np.savetxt('gamma2.txt', np.array(gamma.data))
-                np.savetxt('xij2.txt', np.array(xij))
 
-            elif i == 49:
-                print('save_gamma3_xij_ok')
-                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=1)
-                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
-                gamma = Varmodel(users, items)
-                np.savetxt('gamma3.txt', np.array(gamma.data))
-                np.savetxt('xij3.txt', np.array(xij))
-        
+
         bar.set_description(output_information)
         torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
         if globals().get('Varmodel'):
             torch.save(Varmodel.state_dict(), f"../checkpoints/Var-{world.sampling_type.name}.pth.tar")
-        if i%5 == 0:
+        if i%3 == 0 and i != 0:
             # test
             bar.set_description("[TEST]")
             testDict = dataset.getTestDict()
