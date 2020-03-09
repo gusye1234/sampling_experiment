@@ -7,7 +7,7 @@ TEST = False
 if TEST:
     alldata = pd.read_csv("../data/lastfmi/all_data.csv",header=0, index_col=0)
 else:
-    alldata = np.loadtxt("../data/lastfmi/alltrain.txt")
+    alldata = np.loadtxt("../data/samwalk_data/data1.txt")
     alldata = pd.DataFrame(alldata)
 
 # print(alldata.head())

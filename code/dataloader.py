@@ -43,7 +43,7 @@ class LastFM(BasicDataset):
     Incldue graph information
     LastFM dataset
     """
-    def __init__(self, path="../data/lastfmi"):
+    def __init__(self, path="../data/samwalk_data"):
         # train or test
         self.mode_dict = {'train':0, "test":1}
         self.mode    = self.mode_dict['train']
@@ -51,8 +51,10 @@ class LastFM(BasicDataset):
         self.m_items = 4489
         # trainData = pd.read_table(join(path, 'train.txt'), header=None)
         trainData = np.loadtxt(join(path, 'train.txt'))
+        print("training data:",join(path, 'train.txt'))
         # testData  = pd.read_table(join(path, 'test.txt'), header=None)
-        testData  = np.loadtxt(join(path, 'test.txt'))
+        testData  = np.loadtxt(join(path, 'validation.txt'))
+        print("testing data:", join(path, 'validation.txt'))
         trainData-= 1
         testData -= 1
         self.trainData = trainData

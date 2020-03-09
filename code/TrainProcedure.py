@@ -13,7 +13,7 @@ import model
 import multiprocessing
           
 CORES = world.CORES
-FAST_SAMPLE_START = 150
+FAST_SAMPLE_START = 80
           
           
 def Alldata_train(dataset, recommend_model, loss_class, epoch, varmodel=None,w=None):
@@ -39,7 +39,42 @@ def Alldata_train(dataset, recommend_model, loss_class, epoch, varmodel=None,w=N
         if world.tensorboard:
             w.add_scalar("Alldata/stageOne", loss1, epoch*(int(datalen/world.config['bpr_batch_size'])+1) + batch_i)
     return f"[ALL[{datalen}]]"
-    
+
+          
+def Alldata_train_set_gamma_cross_entrophy(dataset, recommend_model, loss_class, epoch, w=None):
+    print('begin Alldata_train_set_gamma_cross_entrophy!')
+    Recmodel : model.RecMF = recommend_model
+    loss_class : utils.ELBO
+    Recmodel.train()
+    gamma = torch.ones((dataset.n_users, dataset.m_items))*0.5
+    (epoch_users,
+     epoch_items,
+     epoch_xij,
+     epoch_gamma) = utils.getAllData(dataset, gamma)
+    epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
+    datalen = len(epoch_users)
+    rating = Recmodel(epoch_users, epoch_items)
+    print(epoch_users[:1000], epoch_items[:1000], epoch_xij[:1000], rating[:1000])
+    loss1 = loss_class.stageOne(rating, epoch_xij, epoch_gamma)
+
+    # for (batch_i, (batch_users, batch_items, batch_xij, batch_gamma)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij, epoch_gamma)):
+    # if epoch == 0:
+    # print(len(batch_users))
+
+    # rating = Recmodel(batch_users, batch_items)
+    # loss1 = loss_class.stageOne(rating, batch_xij, batch_gamma)
+
+    # if batch_i == 99:
+        #print(batch_users[:1000], batch_items[:1000], batch_xij[:1000], rating[:1000], batch_gamma[:1000])
+
+    # if world.tensorboard:
+        # w.add_scalar(f'Alldata_train_set_gamma_cross_entrophy/stageOne', loss1, epoch*world.config['total_batch'] + batch_i)
+    if world.tensorboard:
+        w.add_scalar("Alldata_train_set_gamma_cross_entrophy/stageOne", loss1, epoch)
+
+    print('end Alldata_train_set_gamma_cross_entrophy!')
+    return f"[ALL[{datalen}]]"
+
 def BPR_train(dataset, loader,recommend_model, loss_class, epoch, w=None):
     Recmodel = recommend_model
     Recmodel.train()
@@ -61,6 +96,41 @@ def BPR_train(dataset, loader,recommend_model, loss_class, epoch, w=None):
         if world.tensorboard:
             w.add_scalar(f'BPRLoss/BPR', cri, epoch*int(len(users)/world.config['bpr_batch_size']) + batch_i)
     return f"[BPR[{cri:.3e}]]"
+    
+    
+def Alldata_train_ELBO(dataset, recommend_model, var_model, loss_class, epoch, w=None):
+    print('begin Alldata_train_ELBO!')
+    Recmodel: model.RecMF = recommend_model
+    Varmodel: model.VarMF_reg = var_model
+    loss_class: utils.ELBO
+
+
+    (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
+    epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
+    datalen = len(epoch_users)
+    for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
+
+        if batch_i == 0:
+            print(len(batch_users))
+        Recmodel.train()
+        Varmodel.eval()
+        rating = Recmodel(batch_users, batch_items)
+        batch_gamma = Varmodel(batch_users, batch_items)
+        loss1 = loss_class.stageOne(rating, batch_xij, batch_gamma)
+
+        Recmodel.eval()
+        Varmodel.train()
+        rating = Recmodel(batch_users, batch_items)
+        batch_gamma = Varmodel(batch_users, batch_items)
+        loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
+
+        if world.tensorboard:
+            w.add_scalar(f'Alldata_train_ELBO/stageOne', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
+            w.add_scalar(f'Alldata_train_ELBO/stageTwo', loss2, epoch*round(datalen/world.config['batch_size']) + batch_i)
+
+    print('end Alldata_train_ELBO!')
+
+    return f"[ALL[{datalen}]]"
     
 
 def uniform_train(dataset, loader,recommend_model, loss_class, Neg_k, epoch, w=None):
@@ -188,39 +258,6 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
             w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch*world.config['total_batch'] + batch_i)
     return f"Sparsity {np.sum(epoch_xij)/len(epoch_xij):.3f}"
 
-
-# def Test(dataset, Recmodel, top_k, epoch, w=None):
-#     dataset : utils.BasicDataset
-#     testDict : dict = dataset.getTestDict()
-#     Recmodel : model.RecMF
-#     with torch.no_grad():
-#         Recmodel.eval()
-#         users = torch.Tensor(list(testDict.keys()))
-#         GroundTrue = [testDict[user] for user in users.numpy()]
-#         rating = Recmodel.getUsersRating(users)
-#         # exclude positive train data
-#         allPos = dataset.getUserPosItems(users)
-#         exclude_index = []
-#         exclude_items = []
-#         for range_i, items in enumerate(allPos):
-#             exclude_index.extend([range_i]*len(items))
-#             exclude_items.extend(items)
-#         rating[exclude_index, exclude_items] = 0.
-#         # assert torch.all(rating >= 0.)
-#         # assert torch.all(rating <= 1.)
-#         # end excluding
-#         _, top_items = torch.topk(rating, top_k)
-#         top_items = top_items.cpu().numpy()
-#         metrics = utils.recall_precisionATk(GroundTrue, top_items, top_k)
-#         metrics['mrr'] = utils.MRRatK(GroundTrue, top_items, top_k)
-#         metrics['ndcg'] = utils.NDCGatK(GroundTrue, top_items, top_k)
-#         # pprint(metrics)
-#         if world.tensorboard:
-#             w.add_scalar(f'Test/Recall@{top_k}', metrics['recall'], epoch)
-#             w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
-#             w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
-#             w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
-            
 
 def sampler_train_GMF(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch, w):
     # global users_set, items_set
@@ -526,7 +563,7 @@ def sampler_train_no_batch_LGN_mixture(dataset, sampler1, sampler2, recommend_mo
     # sampler.compute()
     title = "GMF"
     if epoch <= FAST_SAMPLE_START:
-        print('sampler1')
+        # print('sampler1')
         epoch_users, epoch_items = sampler1.sampleForEpoch(dataset, k=3)  # epoch_k may be 5*n
 
         epoch_users, epoch_items = utils.shuffle(epoch_users, epoch_items)
@@ -541,10 +578,15 @@ def sampler_train_no_batch_LGN_mixture(dataset, sampler1, sampler2, recommend_mo
             recommend_model.train()
             var_model.eval()
             user_emb = var_model.getUsersEmbedding(users)
-            print('1:3_1', user_emb)
+            # print('1:3_1', user_emb)
 
             gamma = var_model(users, items)
             rating = recommend_model(users, items)
+            
+            gamma_writed = gamma.detach().numpy()
+            xij_writed   = xij.detach().numpy()
+            writed   = np.vstack([gamma_writed, xij_writed]).T
+            np.savetxt("gamma_lgn_before.txt", writed)
 
             loss1 = loss_class.stageOne(rating, xij, gamma)
             recommend_model.eval()
@@ -553,11 +595,11 @@ def sampler_train_no_batch_LGN_mixture(dataset, sampler1, sampler2, recommend_mo
             rating = recommend_model(users, items)
             loss2 = loss_class.stageTwo(rating, gamma, xij)
             user_emb = var_model.getUsersEmbedding(users)
-            if batch_i == world.config['total_batch']:
-                print('the last batch:', batch_users[:1000], batch_items[:1000], batch_xij[:1000], rating[:1000],
-                      gamma[:1000])
+            # if batch_i == world.config['total_batch']:
+            #     print('the last batch:', batch_users[:1000], batch_items[:1000], batch_xij[:1000], rating[:1000],
+            #           gamma[:1000])
 
-            print('1:3_2', user_emb)
+            # print('1:3_2', user_emb)
 
             if world.tensorboard:
                 w.add_scalar(f'sampler_train_no_batch_LGN_mixture/stageOne', loss1, epoch)
@@ -631,7 +673,8 @@ def Test(dataset, Recmodel, top_k, epoch, w=None):
     # eval mode with no dropout
     Recmodel = Recmodel.eval()
     max_K = max(world.topks)
-    pool = multiprocessing.Pool(CORES)
+    if world.multi_cores:
+        pool = multiprocessing.Pool(CORES)
     results = {'precision': np.zeros(len(world.topks)), 
               'recall': np.zeros(len(world.topks)), 
               'ndcg': np.zeros(len(world.topks))}
@@ -667,7 +710,13 @@ def Test(dataset, Recmodel, top_k, epoch, w=None):
             groundTrue_list.append(groundTrue)
         assert total_batch == len(users_list)
         X = zip(rating_list, groundTrue_list)
-        pre_results = pool.map(test_one_batch, X)
+        if world.multi_cores:
+            pre_results = pool.map(test_one_batch, X)
+        else:
+            pre_results = []
+            for data in X:
+                result = test_one_batch(X)
+                pre_results.append(result)
         for result in pre_results:
             results['recall'] += result['recall'] / total_batch
             results['precision'] += result['precision'] / total_batch
@@ -684,4 +733,38 @@ def Test(dataset, Recmodel, top_k, epoch, w=None):
         
     
             
+            
+            
+
+# def Test(dataset, Recmodel, top_k, epoch, w=None):
+#     dataset : utils.BasicDataset
+#     testDict : dict = dataset.getTestDict()
+#     Recmodel : model.RecMF
+#     with torch.no_grad():
+#         Recmodel.eval()
+#         users = torch.Tensor(list(testDict.keys()))
+#         GroundTrue = [testDict[user] for user in users.numpy()]
+#         rating = Recmodel.getUsersRating(users)
+#         # exclude positive train data
+#         allPos = dataset.getUserPosItems(users)
+#         exclude_index = []
+#         exclude_items = []
+#         for range_i, items in enumerate(allPos):
+#             exclude_index.extend([range_i]*len(items))
+#             exclude_items.extend(items)
+#         rating[exclude_index, exclude_items] = 0.
+#         # assert torch.all(rating >= 0.)
+#         # assert torch.all(rating <= 1.)
+#         # end excluding
+#         _, top_items = torch.topk(rating, top_k)
+#         top_items = top_items.cpu().numpy()
+#         metrics = utils.recall_precisionATk(GroundTrue, top_items, top_k)
+#         metrics['mrr'] = utils.MRRatK(GroundTrue, top_items, top_k)
+#         metrics['ndcg'] = utils.NDCGatK(GroundTrue, top_items, top_k)
+#         # pprint(metrics)
+#         if world.tensorboard:
+#             w.add_scalar(f'Test/Recall@{top_k}', metrics['recall'], epoch)
+#             w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
+#             w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
+#             w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
             

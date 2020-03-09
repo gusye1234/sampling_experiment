@@ -97,6 +97,22 @@ elif world.sampling_type == SamplingAlgorithms.light_gcn_mixture:
                       rec_model = Recmodel,var_model=Varmodel)
     sampler1 = utils.sample_for_basic_GMF_loss(k=3)
     sampler2 = utils.Sample_MF(k=1, var_model=Varmodel)
+elif world.sampling_type == SamplingAlgorithms.Alldata_train_ELBO:
+    print('Alldata_train_ELBO train')
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN(world.config, dataset)
+    sampler_gamma_save = utils.sample_for_basic_GMF_loss(k=1)
+    elbo = utils.ELBO(world.config,
+                      rec_model=Recmodel,
+                      var_model=Varmodel)
+elif world.sampling_type == SamplingAlgorithms.Sample_positive_all:
+    print('Sample_positive_all')
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN(world.config, dataset)
+    elbo = utils.ELBO(world.config,
+                      rec_model=Recmodel, var_model=Varmodel)
+    sampler = utils.Sample_positive_all(dataset, Varmodel)
+
 
 # train
 Neg_k = 3
@@ -132,6 +148,35 @@ try:
         elif world.sampling_type == SamplingAlgorithms.light_gcn_mixture:
             epoch_k = 166972
             output_information = TrainProcedure.sampler_train_no_batch_LGN_mixture(dataset, sampler1, sampler2, Recmodel, Varmodel, elbo, epoch_k, i, w)
+        elif world.sampling_type == SamplingAlgorithms.Sample_positive_all:
+            epoch_k = dataset.trainDataSize * 4
+            output_information = TrainProcedure.Sample_positive_all_LGN(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i, w)
+            print('end one epoch spa')
+        elif world.sampling_type == SamplingAlgorithms.Alldata_train_ELBO:
+            output_information = TrainProcedure.Alldata_train_ELBO(dataset, Recmodel, Varmodel, elbo, i, w=w)
+            if i == 15:
+                print('save_gamma1_xij_ok')
+                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=1)
+                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                gamma = Varmodel(users, items)
+                np.savetxt('gamma1.txt', np.array(gamma.data))
+                np.savetxt('xij1.txt', np.array(xij))
+                print('save_ok')
+            elif i == 25:
+                print('save_gamma2_xij_ok')
+                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=1)
+                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                gamma = Varmodel(users, items)
+                np.savetxt('gamma2.txt', np.array(gamma.data))
+                np.savetxt('xij2.txt', np.array(xij))
+
+            elif i == 49:
+                print('save_gamma3_xij_ok')
+                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=1)
+                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                gamma = Varmodel(users, items)
+                np.savetxt('gamma3.txt', np.array(gamma.data))
+                np.savetxt('xij3.txt', np.array(xij))
         
         bar.set_description(output_information)
         torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
