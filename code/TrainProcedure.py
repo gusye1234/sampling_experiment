@@ -715,7 +715,7 @@ def Test(dataset, Recmodel, top_k, epoch, w=None):
         else:
             pre_results = []
             for data in X:
-                result = test_one_batch(X)
+                result = test_one_batch(data)
                 pre_results.append(result)
         for result in pre_results:
             results['recall'] += result['recall'] / total_batch
