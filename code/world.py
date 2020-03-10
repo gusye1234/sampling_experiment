@@ -11,12 +11,14 @@ args = parse_args()
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 class SamplingAlgorithms(Enum):
   Alldata_train_set_gamma_cross_entrophy   = 1 # it sucks
-  all_data_MF_MF   = 2
-  all_data_LGN_MF       = 3
+  all_data_MF_MF      = 2
+  all_data_LGN_MF     = 3
   all_data_MFxij_MF   = 4
-  all_data_LGNxij_MF       = 5
-  Sample_all_dataset = 6
+  all_data_LGNxij_MF  = 5
+  Sample_all_dataset  = 6
   Sample_positive_all = 7
+  all_data_LGNxij2_MF = 8
+  all_data_MFxij2_MF = 8
 sampling_type = SamplingAlgorithms.all_data_MF_MF
 
 

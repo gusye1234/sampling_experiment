@@ -107,6 +107,23 @@ elif world.sampling_type == SamplingAlgorithms.Sample_positive_all:
     if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-Sample_all_dataset.pth.tar')))
         Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-Sample_all_dataset.pth.tar')))
+elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij2_MF:
+    print(world.sampling_type.name)
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN_xij2(world.config, dataset)
+    elbo = utils.ELBO(world.config,
+                    rec_model=Recmodel,
+                    var_model=Varmodel)
+elif world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF:
+    print(world.sampling_type.name)
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.VarMF_xij2(world.config, dataset)
+    elbo = utils.ELBO(world.config,
+                    rec_model=Recmodel,
+                    var_model=Varmodel)
+
+
+
 
 # train
 Neg_k = 3
@@ -129,10 +146,10 @@ try:
         elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
             output_information = TrainProcedure.all_data_LGN_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
 
-        elif world.sampling_type == SamplingAlgorithms.all_data_MFxij_MF:
+        elif world.sampling_type == SamplingAlgorithms.all_data_MFxij_MF or world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF:
             output_information = TrainProcedure.all_data_MFxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
 
-        elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF:
+        elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF or world.sampling_type == SamplingAlgorithms.all_data_LGNxij2_MF:
             output_information = TrainProcedure.all_data_LGNxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
 
 
