@@ -18,8 +18,10 @@ class SamplingAlgorithms(Enum):
   Sample_all_dataset  = 6
   Sample_positive_all = 7
   all_data_LGNxij2_MF = 8
-  all_data_MFxij2_MF = 8
-sampling_type = SamplingAlgorithms.all_data_MF_MF
+  all_data_MFxij2_MF = 9
+types = list(SamplingAlgorithms)  
+  
+sampling_type = types[args.type-1]
 
 
 
@@ -46,7 +48,7 @@ config['xij_dim'] = 8
 config['num_xij'] = 1
 # ======================
 TRAIN_epochs = 1000
-LOAD = True
+LOAD = False
 PATH = '../checkpoints'
 top_k = 5
 topks = 5

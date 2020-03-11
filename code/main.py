@@ -123,15 +123,16 @@ elif world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF:
                     var_model=Varmodel)
 
 
-
-
+Recmodel = Recmodel.to(world.device)
+if globals().get('Varmodel'):
+    Varmodel = Varmodel.to(world.device)
 # train
 Neg_k = 3
 world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
 
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("./output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter("/output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
 try:
@@ -152,8 +153,8 @@ try:
         elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF or world.sampling_type == SamplingAlgorithms.all_data_LGNxij2_MF:
             output_information = TrainProcedure.all_data_LGNxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
 
-
         elif world.sampling_type == SamplingAlgorithms.Sample_all_dataset:
+            epoch_k = dataset.trainDataSize * 4
             output_information = TrainProcedure.sampler_train(dataset, sampler, Recmodel, Varmodel, elbo, epoch_k, i,w)
         elif world.sampling_type == SamplingAlgorithms.Sample_positive_all:
             epoch_k = dataset.trainDataSize * 4

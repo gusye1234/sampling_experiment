@@ -23,13 +23,13 @@ class ELBO:
         gamma  : shape(batch_size, 1)
         xij    : shape(batch_size, 1)
     """
-    eps = torch.Tensor([1e-8]).float()
+    eps = torch.Tensor([1e-8]).float().to(world.device)
     def __init__(self, config,
                  rec_model, var_model):
         rec_model : nn.Module
         var_model : nn.Module
-        self.epsilon = torch.Tensor([config['epsilon']])
-        self.eta     = torch.Tensor([config['eta']])
+        self.epsilon = torch.Tensor([config['epsilon']]).to(world.device)
+        self.eta     = torch.Tensor([config['eta']]).to(world.device)
         self.bce     = nn.BCELoss()
         rec_lr = config['rec_lr']
         var_lr = config['var_lr']

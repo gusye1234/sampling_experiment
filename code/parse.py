@@ -15,7 +15,7 @@ def parse_args():
                         help="learning rate for var model")
     parser.add_argument('--vardecay', type=float,default=0.001,
                         help="weight decay for var model")
-    parser.add_argument('--recdecay', type=float,default=0.01,
+    parser.add_argument('--recdecay', type=float,default=0.001,
                         help="weight decay for rec model")
     parser.add_argument('--layer', type=int,default=2,
                         help="the layer num of lightGCN")
@@ -32,5 +32,7 @@ def parse_args():
     parser.add_argument('--comment', type=str,default="lgn")
     parser.add_argument('--load', type=bool,default=False)
     parser.add_argument('--epochs', type=int,default=100)
+    parser.add_argument('--type', type=int,default=1,
+                        help="training procedure types, ranging from 1 to 9")
     
     return parser.parse_args()

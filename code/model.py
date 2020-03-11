@@ -179,7 +179,7 @@ class VarMF_xij(nn.Module):
 class VarMF_xij2(nn.Module):
 
     def __init__(self, config):
-        super(VarMF_xij, self).__init__()
+        super(VarMF_xij2, self).__init__()
         self.num_users = config['num_users']
         self.num_items = config['num_items']
         self.num_xij = config['num_xij']
@@ -202,7 +202,6 @@ class VarMF_xij2(nn.Module):
         items_emb = self.embedding_item(items.long())
         xij_long = xij.long()
         xij_emb = self.embedding_xij(xij.long())
-        xij_emb = self.embedding_xij.weight.repeat(len(users), 1)
 
         users_emb = self.sig(torch.cat([users_emb, xij_emb], dim=1))
         items_emb = self.soft(torch.cat([items_emb, xij_emb], dim=1))
@@ -231,7 +230,7 @@ class LightGCN(nn.Module):
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
         self.drop = self.config['dropout']
-        self.Graph = self.dataset.getSparseGraph().coalesce()
+        self.Graph = self.dataset.getSparseGraph().coalesce().to(world.device)
 
     def allGamma(self, users):
         """
@@ -359,7 +358,7 @@ class LightGCN_xij(nn.Module):
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
         self.drop      = self.config['dropout']
-        self.Graph = self.dataset.getSparseGraph().coalesce()
+        self.Graph = self.dataset.getSparseGraph().coalesce().to(world.device)
         #print("save_txt")
         #np.savetxt('init_weight.txt', np.array(self.embedding_user.weight.detach()))
 
@@ -415,7 +414,7 @@ class LightGCN_xij(nn.Module):
 
 class LightGCN_xij2(nn.Module):
     def __init__(self, config, dataset):
-        super(LightGCN_xij, self).__init__()
+        super(LightGCN_xij2, self).__init__()
         self.config = config
         self.dataset: dataloader.BasicDataset = dataset
         self.sig = nn.Sigmoid()
@@ -435,7 +434,7 @@ class LightGCN_xij2(nn.Module):
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
         self.drop      = self.config['dropout']
-        self.Graph = self.dataset.getSparseGraph().coalesce()
+        self.Graph = self.dataset.getSparseGraph().coalesce().to(world.device)
         #print("save_txt")
         #np.savetxt('init_weight.txt', np.array(self.embedding_user.weight.detach()))
 

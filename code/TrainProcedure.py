@@ -67,7 +67,9 @@ def all_data_MF_MF(dataset, recommend_model, var_model, loss_class, epoch, w=Non
     epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
     datalen = len(epoch_users)
     for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
-
+        batch_users = batch_users.to(world.device)
+        batch_items = batch_items.to(world.device)
+        batch_xij = batch_xij.to(world.device)
         if batch_i == 0:
             print(len(batch_users))
         Recmodel.train()
@@ -101,7 +103,9 @@ def all_data_LGN_MF(dataset, recommend_model, var_model, loss_class, epoch, w=No
     epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
     datalen = len(epoch_users)
     for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
-
+        batch_users = batch_users.to(world.device)
+        batch_items = batch_items.to(world.device)
+        batch_xij = batch_xij.to(world.device)
         if batch_i == 0:
             print(len(batch_users))
         Recmodel.train()
@@ -135,7 +139,9 @@ def all_data_MFxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w=
     epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
     datalen = len(epoch_users)
     for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
-
+        batch_users = batch_users.to(world.device)
+        batch_items = batch_items.to(world.device)
+        batch_xij = batch_xij.to(world.device)
         if batch_i == 0:
             print(len(batch_users))
         Recmodel.train()
@@ -169,7 +175,9 @@ def all_data_LGNxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w
     epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
     datalen = len(epoch_users)
     for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
-
+        batch_users = batch_users.to(world.device)
+        batch_items = batch_items.to(world.device)
+        batch_xij = batch_xij.to(world.device)
         if batch_i == 0:
             print(len(batch_users))
         Recmodel.train()
@@ -215,6 +223,9 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
     # print(f"[{epoch}]Positive Label Sparsity",np.sum(epoch_xij)/len(epoch_xij))
     # print(epoch_users[:5], epoch_items[:5], epoch_xij[:5])
     for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
+        batch_users = batch_users.to(world.device)
+        batch_items = batch_items.to(world.device)
+        batch_xij = batch_xij.to(world.device)
         users = batch_users.long()
         # print(users.size())
         items = batch_items.long()
@@ -241,9 +252,11 @@ def Test(dataset, Recmodel, top_k, epoch, w=None):
      Recmodel : model.RecMF
      with torch.no_grad():
          Recmodel.eval()
-         users = torch.Tensor(list(testDict.keys()))
+         users = list(testDict.keys())
+         users_tensor = torch.Tensor(list(testDict.keys())).to(world.device)
          GroundTrue = [testDict[user] for user in users.numpy()]
-         rating = Recmodel.getUsersRating(users)
+         rating = Recmodel.getUsersRating(users_tensor)
+         rating = rating.cpu()
          # exclude positive train data
          allPos = dataset.getUserPosItems(users)
          exclude_index = []
