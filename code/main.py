@@ -57,7 +57,7 @@ elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
     Varmodel = model.LightGCN(world.config, dataset)
     elbo = utils.ELBO(world.config,
                       rec_model=Recmodel,
-                      var_model=Varmodel)
+                      var_model=Varmodel, no_var_decay = True)
     if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-all_data_LGN_MF.pth.tar')))
         Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-all_data_LGN_MF.pth.tar')))
@@ -79,7 +79,7 @@ elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF:
     Varmodel = model.LightGCN_xij(world.config, dataset)
     elbo = utils.ELBO(world.config,
                       rec_model=Recmodel,
-                      var_model=Varmodel)
+                      var_model=Varmodel, no_var_decay=True)
     if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-all_data_LGNxij_MF.pth.tar')))
         Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-all_data_LGNxij_MF.pth.tar')))
@@ -90,7 +90,7 @@ elif world.sampling_type == SamplingAlgorithms.Sample_all_dataset:
     Varmodel = model.LightGCN_xij(world.config, dataset)
     elbo = utils.ELBO(world.config, 
                     rec_model=Recmodel, 
-                    var_model=Varmodel)
+                    var_model=Varmodel, no_var_decay=True)
     sampler = utils.Sample_MF(k=1, var_model=Varmodel) 
     if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-Sample_all_dataset.pth.tar')))
@@ -102,7 +102,7 @@ elif world.sampling_type == SamplingAlgorithms.Sample_positive_all:
     Varmodel = model.LightGCN_xij(world.config, dataset)
     elbo = utils.ELBO(world.config,
                     rec_model=Recmodel,
-                    var_model=Varmodel)
+                    var_model=Varmodel, no_var_decay=True)
     sampler = utils.Sample_positive_all(dataset, Varmodel)
     if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-Sample_all_dataset.pth.tar')))
@@ -113,7 +113,7 @@ elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij2_MF:
     Varmodel = model.LightGCN_xij2(world.config, dataset)
     elbo = utils.ELBO(world.config,
                     rec_model=Recmodel,
-                    var_model=Varmodel)
+                    var_model=Varmodel,no_var_decay=True)
 elif world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF:
     print(world.sampling_type.name)
     Recmodel = model.RecMF(world.config)

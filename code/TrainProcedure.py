@@ -53,9 +53,6 @@ def Alldata_train_set_gamma_cross_entrophy(dataset, recommend_model, loss_class,
     print('end Alldata_train_set_gamma_cross_entrophy!')
     return f"[ALL[{datalen}]]"
 
-
-    
-
 def all_data_MF_MF(dataset, recommend_model, var_model, loss_class, epoch, w=None):
     print('begin all_data_MF_MF!')
     Recmodel: model.RecMF = recommend_model
@@ -117,8 +114,9 @@ def all_data_LGN_MF(dataset, recommend_model, var_model, loss_class, epoch, w=No
         Recmodel.eval()
         Varmodel.train()
         rating = Recmodel(batch_users, batch_items)
-        batch_gamma = Varmodel(batch_users, batch_items)
-        loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
+        batch_gamma, reg_loss = Varmodel.forwardWithReg(batch_users, batch_items)
+        # batch_gamma = Varmodel(batch_users, batch_items)
+        loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, reg_loss=reg_loss)
 
         if world.tensorboard:
             w.add_scalar(f'all_data_LGN_MF/stageOne', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
@@ -189,8 +187,9 @@ def all_data_LGNxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w
         Recmodel.eval()
         Varmodel.train()
         rating = Recmodel(batch_users, batch_items)
-        batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
-        loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
+        batch_gamma, reg_loss = Varmodel.forwardWithReg(batch_users, batch_items, batch_xij)
+        # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
+        loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, reg_loss=reg_loss)
 
         if world.tensorboard:
             w.add_scalar(f'all_data_LGNxij_MF/stageOne', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
@@ -200,10 +199,6 @@ def all_data_LGNxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w
 
     return f"[ALL[{datalen}]]"
     
-
-
-
-
 def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch_k, epoch,w):
     # global users_set, items_set
     sampler : utils.Sample_MF
@@ -244,7 +239,6 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
             w.add_scalar(f'SamplerLoss/stageOne', loss1, epoch*world.config['total_batch'] + batch_i)
             w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch*world.config['total_batch'] + batch_i)
     return f"Sparsity {np.sum(epoch_xij)/len(epoch_xij):.3f}"
-
 
 def Test(dataset, Recmodel, top_k, epoch, w=None):
      dataset : utils.BasicDataset

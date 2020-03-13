@@ -29,6 +29,7 @@ class RecMF(nn.Module):
         items_emb = self.embedding_item.weight
         rating = self.f(torch.matmul(users_emb, items_emb.t()))
         return rating
+
     def forwardNoSig(self, users, items):
         try:
             assert len(users) == len(items)
@@ -197,10 +198,8 @@ class VarMF_xij2(nn.Module):
         except AssertionError:
             raise AssertionError(f"(Rec)users and items should be paired, \
                                  but we got {len(users)} users and {len(items)} items")
-
         users_emb = self.embedding_user(users.long())
         items_emb = self.embedding_item(items.long())
-        xij_long = xij.long()
         xij_emb = self.embedding_xij(xij.long())
 
         users_emb = self.sig(torch.cat([users_emb, xij_emb], dim=1))
@@ -230,6 +229,7 @@ class LightGCN(nn.Module):
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
         self.drop = self.config['dropout']
+        self.weight_decay = self.config['var_weight_decay']
         self.Graph = self.dataset.getSparseGraph().coalesce().to(world.device)
 
     def allGamma(self, users):
@@ -262,17 +262,7 @@ class LightGCN(nn.Module):
             all_users, _ = self.computer()
             users_emb = self.sig(all_users)
             return users_emb
-
-            # def getGammaForUsers(self, users):
-
-    #     """
-    #     calculate gammas of all items for specific users
-    #     """
-    #     with torch.no_grad():
-    #         users_emb = self.embedding_user(users)
-    #         users_emb = self.sig(users_emb)
-    #         items = self.getAllItemsEmbedding()
-
+        
     def getAllItemsEmbedding(self):
         """
         calculate all items embedding for specific sampling algorithm
@@ -320,7 +310,15 @@ class LightGCN(nn.Module):
         light_out = torch.mean(embs, dim=1)
         users, items = torch.split(light_out, [self.num_users, self.num_items])
         return users, items
-        
+    
+    def forwardWithReg(self,users, items):
+        gamma = self.forward(users, items)
+        userEmb_ego = self.embedding_user(users)
+        itemEmb_ego = self.embedding_item(items)
+        reg_loss = (1/2)*self.weight_decay*(torch.norm(userEmb_ego, 2).pow(2) + torch.norm(itemEmb_ego, 2).pow(2))
+        reg_loss = reg_loss/float(len(users))
+        return gamma, reg_loss
+    
     def forward(self, users, items):
         # compute embedding
         all_users, all_items = self.computer()
@@ -397,6 +395,18 @@ class LightGCN_xij(nn.Module):
         users, items = torch.split(light_out, [self.num_users, self.num_items])
         return users, items
 
+    def forwardWithReg(self,users, items, xij):
+        gamma = self.forward(users, items, xij)
+        userEmb_ego = self.embedding_user(users)
+        itemEmb_ego = self.embedding_item(items)
+        xijEmb      = self.embedding_xij.weight
+        reg_loss = (1/2)*self.weight_decay*(torch.norm(userEmb_ego, 2).pow(2) + 
+                                            torch.norm(itemEmb_ego, 2).pow(2) + 
+                                            torch.norm(xijEmb,      2).pow(2))
+        reg_loss = reg_loss/float(len(users))
+        return gamma, reg_loss
+    
+
     def forward(self, users, items, xij):
         # compute embedding
         all_users, all_items = self.computer()
@@ -472,6 +482,17 @@ class LightGCN_xij2(nn.Module):
         light_out = torch.mean(embs, dim=1)
         users, items = torch.split(light_out, [self.num_users, self.num_items])
         return users, items
+    
+    def forwardWithReg(self, users, items, xij):
+        gamma = self.forward(users, items, xij)
+        userEmb_ego = self.embedding_user(users)
+        itemEmb_ego = self.embedding_item(items)
+        xijEmb      = self.embedding_xij.weight
+        reg_loss = (1/2)*self.weight_decay*(torch.norm(userEmb_ego, 2).pow(2) + 
+                                            torch.norm(itemEmb_ego, 2).pow(2) + 
+                                            torch.norm(xijEmb,      2).pow(2))
+        reg_loss = reg_loss/float(len(users))
+        return gamma, reg_loss
 
     def forward(self, users, items, xij):
         # compute embedding
@@ -553,14 +574,15 @@ class LightGCN_xij_Symmetric_nopersonal(nn.Module):
     def forward(self, users, items, xij):
         # compute embedding
         all_users, all_items = self.computer()
-        #print('forward')
+        # print('forward')
         # all_users, all_items = self.computer()
         users_emb = all_users[users]
         items_emb = all_items[items]
         xij_long = xij.long()
-        xij_emb = self.embedding_xij(xij_long)
-        users_emb = self.sig(torch.cat([users_emb, xij_emb], dim=1))
-        items_emb = self.soft(torch.cat([items_emb, xij_emb], dim=1))
+        users_xij = self.embedding_user_xij2(xij_long)
+        items_xij = self.embedding_item_xij2(xij_long)
+        users_emb = self.sig(torch.cat([users_emb, users_xij], dim=1))
+        items_emb = self.soft(torch.cat([items_emb,items_xij], dim=1))
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
         return gamma
