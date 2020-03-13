@@ -49,12 +49,18 @@ class LastFM(BasicDataset):
         self.mode    = self.mode_dict['train']
         self.n_users = 1892
         self.m_items = 4489
+        if world.ontest:
+            trainData = np.loadtxt(join(path, 'data1.txt'))    
+            print("training data:",join(path, 'data1.txt'))
+            testData  = np.loadtxt(join(path, 'test1.txt'))
+            print("testing data:", join(path, 'test1.txt'))
         # trainData = pd.read_table(join(path, 'train.txt'), header=None)
-        trainData = np.loadtxt(join(path, 'train.txt'))
-        print("training data:",join(path, 'train.txt'))
-        # testData  = pd.read_table(join(path, 'test.txt'), header=None)
-        testData  = np.loadtxt(join(path, 'validation.txt'))
-        print("testing data:", join(path, 'validation.txt'))
+        else:
+            trainData = np.loadtxt(join(path, 'train.txt'))
+            print("training data:",join(path, 'train.txt'))
+            # testData  = pd.read_table(join(path, 'test.txt'), header=None)
+            testData  = np.loadtxt(join(path, 'validation.txt'))
+            print("testing data:", join(path, 'validation.txt'))
         trainData-= 1
         testData -= 1
         self.trainData = trainData

@@ -25,6 +25,8 @@ def parse_args():
                         help="the batch size for bpr loss training procedure")
     parser.add_argument('--testbatch', type=int,default=100,
                         help="the batch size of users for testing")
+    parser.add_argument('--ontest', type=int,default=0,
+                        help="set 1 to run test on test1.txt, set 0 to run test on validation.txt")
     parser.add_argument('--path', type=str,default="./checkpoints",
                         help="path to save weights")
     parser.add_argument('--tensorboard', type=bool,default="./checkpoints",

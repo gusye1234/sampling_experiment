@@ -58,6 +58,8 @@ GPU = torch.cuda.is_available()
 device = torch.device('cuda' if GPU else "cpu")
 CORES = multiprocessing.cpu_count() // 2
 multi_cores = False
+ontest = args.ontest()
+
 
 # let pandas shut up
 from warnings import simplefilter
