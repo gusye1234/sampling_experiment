@@ -254,7 +254,7 @@ def Test(dataset, Recmodel, top_k, epoch, w=None):
          Recmodel.eval()
          users = list(testDict.keys())
          users_tensor = torch.Tensor(list(testDict.keys())).to(world.device)
-         GroundTrue = [testDict[user] for user in users.numpy()]
+         GroundTrue = [testDict[user] for user in users_tensor.cpu().numpy()]
          rating = Recmodel.getUsersRating(users_tensor)
          rating = rating.cpu()
          # exclude positive train data
