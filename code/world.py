@@ -44,7 +44,7 @@ config['lightGCN_n_layers']= args.layer
 config['batch_size'] = 32768
 config['all_batch_size'] = 32768
 config['test_u_batch_size'] = 100
-config['xij_dim'] = 8
+config['xij_dim'] = 1
 config['num_xij'] = 1
 # ======================
 TRAIN_epochs = 1000
@@ -58,7 +58,7 @@ GPU = torch.cuda.is_available()
 device = torch.device('cuda' if GPU else "cpu")
 CORES = multiprocessing.cpu_count() // 2
 multi_cores = False
-ontest = args.ontest()
+ontest = args.ontest
 
 
 # let pandas shut up
