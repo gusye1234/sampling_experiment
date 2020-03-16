@@ -55,9 +55,6 @@ class RecMF(nn.Module):
         rating    = self.f(torch.sum(inner_pro, dim=1))
         return rating
     
-    
-
-
 class VarMF_reg(nn.Module):
     """
     create embeddings for variational inference
@@ -140,8 +137,6 @@ class VarMF_reg(nn.Module):
         inner_pro = torch.mul(users_emb, items_emb)
         gamma     = torch.sum(inner_pro, dim=1)
         return gamma
-    
-    
 class VarMF_xij(nn.Module):
 
     def __init__(self, config):
@@ -204,6 +199,89 @@ class VarMF_xij2(nn.Module):
 
         users_emb = self.sig(torch.cat([users_emb, xij_emb], dim=1))
         items_emb = self.soft(torch.cat([items_emb, xij_emb], dim=1))
+        inner_pro = torch.mul(users_emb, items_emb)
+
+        rating = torch.sum(inner_pro, dim=1)
+
+        return rating
+
+class VarMF_xij_item_personal(nn.Module):
+    def __init__(self, config):
+        super(VarMF_xij_item_personal, self).__init__()
+        self.num_users = config['num_users']
+        self.num_items = config['num_items']
+        self.num_xij = config['num_xij']
+        self.latent_dim = config['latent_dim_var']
+        self.xij_dim = config['xij_dim']
+        self.embedding_user = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.latent_dim+self.xij_dim)
+        self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
+        self.embedding_item_xij1 = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.xij_dim)
+        self.embedding_item_xij0 = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.xij_dim)
+        # self.embedding_user_xij = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.xij_dim)
+        self.sig = nn.Sigmoid()
+        self.soft = nn.Softmax(dim=1)
+
+    def forward(self, users, items, xij):
+        try:
+            assert len(users) == len(items)
+        except AssertionError:
+            raise AssertionError(f"(Rec)users and items should be paired, \
+                                 but we got {len(users)} users and {len(items)} items")
+        users_emb = self.embedding_user(users.long())
+        items_emb = self.embedding_item(items.long())
+        # xij_emb = self.embedding_xij(xij.long())
+        xij_emb = torch.zeros(len(xij), self.xij_dim)
+        xij_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
+        xij_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
+
+        # users_emb = self.sig(torch.cat([users_emb, xij_emb], dim=1))
+        users_emb = self.sig(users_emb)
+        items_emb = self.soft(torch.cat([items_emb, xij_emb], dim=1))
+        inner_pro = torch.mul(users_emb, items_emb)
+
+        rating = torch.sum(inner_pro, dim=1)
+
+        return rating
+ 
+class VarMF_xij_Symmetric_personal(nn.Module):
+    def __init__(self, config):
+        super(VarMF_xij_Symmetric_personal, self).__init__()
+        self.num_users = config['num_users']
+        self.num_items = config['num_items']
+        self.num_xij = config['num_xij']
+        self.latent_dim = config['latent_dim_var']
+        self.xij_dim = config['xij_dim']
+        self.embedding_user = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.latent_dim)
+        self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
+        self.embedding_item_xij1 = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.xij_dim)
+        self.embedding_item_xij0 = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.xij_dim)
+        self.embedding_user_xij1 = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.xij_dim)
+        self.embedding_user_xij0 = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.xij_dim)
+        # self.embedding_user_xij = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.xij_dim)
+        self.sig = nn.Sigmoid()
+        self.soft = nn.Softmax(dim=1)
+
+    def forward(self, users, items, xij):
+        try:
+            assert len(users) == len(items)
+        except AssertionError:
+            raise AssertionError(f"(Rec)users and items should be paired, \
+                                 but we got {len(users)} users and {len(items)} items")
+        users_emb = self.embedding_user(users.long())
+        items_emb = self.embedding_item(items.long())
+        
+        xij_item_emb = torch.zeros(len(xij), self.xij_dim)
+        xij_item_emb[xij.bool()]  = self.embedding_item_xij1(items[xij.bool()].long())
+        xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
+
+        xij_user_emb = torch.zeros(len(xij), self.xij_dim)
+        xij_user_emb[xij.bool()] = self.embedding_user_xij1(users[xij.bool()].long())
+        xij_item_emb[~xij.bool()] = self.embedding_user_xij0(users[~xij.bool()].long())
+
+
+        # users_emb = self.sig(torch.cat([users_emb, xij_emb], dim=1))
+        users_emb = self.sig(torch.cat([users_emb, xij_user_emb], dim=1))
+        items_emb = self.soft(torch.cat([items_emb, xij_item_emb], dim=1))
         inner_pro = torch.mul(users_emb, items_emb)
 
         rating = torch.sum(inner_pro, dim=1)

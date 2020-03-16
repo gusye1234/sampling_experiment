@@ -35,6 +35,6 @@ def parse_args():
     parser.add_argument('--load', type=bool,default=False)
     parser.add_argument('--epochs', type=int,default=100)
     parser.add_argument('--type', type=int,default=1,
-                        help="training procedure types, ranging from 1 to 9")
+                        help="training procedure types, ranging from 1 to 11")
     
     return parser.parse_args()

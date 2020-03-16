@@ -117,10 +117,26 @@ elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij2_MF:
 elif world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF:
     print(world.sampling_type.name)
     Recmodel = model.RecMF(world.config)
-    Varmodel = model.VarMF_xij2(world.config, dataset)
+    Varmodel = model.VarMF_xij2(world.config)
     elbo = utils.ELBO(world.config,
                     rec_model=Recmodel,
                     var_model=Varmodel)
+elif world.sampling_type == SamplingAlgorithms.all_data_MFitemPer_MF:
+    print(world.sampling_type.name)
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.VarMF_xij_item_personal(world.config)
+    elbo = utils.ELBO(world.config,
+                    rec_model=Recmodel,
+                    var_model=Varmodel)
+elif world.sampling_type == SamplingAlgorithms.all_data_MFSymPer_MF:
+    print(world.sampling_type.name)
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.VarMF_xij_Symmetric_personal(world.config)
+    elbo = utils.ELBO(world.config,
+                    rec_model=Recmodel,
+                    var_model=Varmodel)
+
+
 
 
 Recmodel = Recmodel.to(world.device)
@@ -132,7 +148,7 @@ world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
 
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("/output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter("./output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
 try:
@@ -147,10 +163,14 @@ try:
         elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
             output_information = TrainProcedure.all_data_LGN_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
 
-        elif world.sampling_type == SamplingAlgorithms.all_data_MFxij_MF or world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF:
+        elif world.sampling_type == SamplingAlgorithms.all_data_MFxij_MF or \
+            world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF or \
+            world.sampling_type == SamplingAlgorithms.all_data_MFitemPer_MF or \
+            world.sampling_type == SamplingAlgorithms.all_data_MFSymPer_MF:
             output_information = TrainProcedure.all_data_MFxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
 
-        elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF or world.sampling_type == SamplingAlgorithms.all_data_LGNxij2_MF:
+        elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF or \
+            world.sampling_type == SamplingAlgorithms.all_data_LGNxij2_MF:
             output_information = TrainProcedure.all_data_LGNxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
 
         elif world.sampling_type == SamplingAlgorithms.Sample_all_dataset:

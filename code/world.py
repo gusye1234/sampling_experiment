@@ -19,6 +19,8 @@ class SamplingAlgorithms(Enum):
   Sample_positive_all = 7
   all_data_LGNxij2_MF = 8
   all_data_MFxij2_MF = 9
+  all_data_MFitemPer_MF = 10
+  all_data_MFSymPer_MF = 11
 types = list(SamplingAlgorithms)  
   
 sampling_type = types[args.type-1]
@@ -58,7 +60,7 @@ GPU = torch.cuda.is_available()
 device = torch.device('cuda' if GPU else "cpu")
 CORES = multiprocessing.cpu_count() // 2
 multi_cores = False
-ontest = args.ontest()
+ontest = args.ontest
 
 
 # let pandas shut up
