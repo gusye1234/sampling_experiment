@@ -230,7 +230,7 @@ class VarMF_xij_item_personal(nn.Module):
         users_emb = self.embedding_user(users.long())
         items_emb = self.embedding_item(items.long())
         # xij_emb = self.embedding_xij(xij.long())
-        xij_emb = torch.zeros(len(xij), self.xij_dim)
+        xij_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
         xij_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
         xij_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
 
@@ -270,11 +270,11 @@ class VarMF_xij_Symmetric_personal(nn.Module):
         users_emb = self.embedding_user(users.long())
         items_emb = self.embedding_item(items.long())
         
-        xij_item_emb = torch.zeros(len(xij), self.xij_dim)
+        xij_item_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
         xij_item_emb[xij.bool()]  = self.embedding_item_xij1(items[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
 
-        xij_user_emb = torch.zeros(len(xij), self.xij_dim)
+        xij_user_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
         xij_user_emb[xij.bool()] = self.embedding_user_xij1(users[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_user_xij0(users[~xij.bool()].long())
 

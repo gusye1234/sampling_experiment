@@ -126,6 +126,34 @@ def all_data_LGN_MF(dataset, recommend_model, var_model, loss_class, epoch, w=No
 
     return f"[ALL[{datalen}]]"
 
+
+def all_data_MFxij_MF_nobatch(dataset, recommend_model, var_model, loss_class, epoch, w=None):
+    Recmodel: model.RecMF = recommend_model
+    Varmodel: model.VarMF_xij = var_model
+    loss_class: utils.ELBO
+
+
+    (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
+    epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
+    datalen = len(epoch_users)
+    Recmodel.train()
+    Varmodel.eval()
+    rating = Recmodel(epoch_users, epoch_items )
+    gamma = Varmodel(epoch_users, epoch_items, epoch_xij)
+    loss1 = loss_class.stageOne(rating, epoch_xij, gamma)
+    
+    Recmodel.eval()
+    Varmodel.train()
+    rating = Recmodel(epoch_users, epoch_items )
+    gamma = Varmodel(epoch_users, epoch_items, epoch_xij)
+    loss2 = loss_class.stageTwo(rating, gamma, epoch_xij)
+    if world.tensorboard:
+        w.add_scalar(f'all_data_MFxij_MF/stageOne', loss1, epoch)
+        w.add_scalar(f'all_data_MFxij_MF/stageTwo', loss2, epoch)
+    print("[loss:]", loss1 + loss2)
+
+    
+
 def all_data_MFxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w=None):
     print('begin all_data_MFxij_MF!')
     Recmodel: model.RecMF = recommend_model
@@ -273,7 +301,6 @@ def Test(dataset, Recmodel, top_k, epoch, w=None):
              w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
              w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
              w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
-
 
 """def test_one_batch(X):
     sorted_items = X[0].numpy()
