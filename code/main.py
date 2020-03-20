@@ -49,6 +49,7 @@ elif world.sampling_type == SamplingAlgorithms.all_data_MF_MF:
     elbo = utils.ELBO(world.config,
                       rec_model=Recmodel,
                       var_model=Varmodel)
+    sampler_gamma_save = utils.sample_for_basic_GMF_loss(k=9)
 
 
 elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
@@ -58,6 +59,7 @@ elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
     elbo = utils.ELBO(world.config,
                       rec_model=Recmodel,
                       var_model=Varmodel, no_var_decay = True)
+    sampler_gamma_save = utils.sample_for_basic_GMF_loss(k=9)
     if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Rec-all_data_LGN_MF.pth.tar')))
         Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, 'Var-all_data_LGN_MF.pth.tar')))
@@ -128,6 +130,7 @@ elif world.sampling_type == SamplingAlgorithms.all_data_MFitemPer_MF:
     elbo = utils.ELBO(world.config,
                     rec_model=Recmodel,
                     var_model=Varmodel)
+    sampler_gamma_save = utils.sample_for_basic_GMF_loss(k=3)
 elif world.sampling_type == SamplingAlgorithms.all_data_MFSymPer_MF:
     print(world.sampling_type.name)
     Recmodel = model.RecMF(world.config)
@@ -135,6 +138,12 @@ elif world.sampling_type == SamplingAlgorithms.all_data_MFSymPer_MF:
     elbo = utils.ELBO(world.config,
                     rec_model=Recmodel,
                     var_model=Varmodel)
+elif world.sampling_type == SamplingAlgorithms.all_data_LGNitemPer_MF:
+    print(world.sampling_type.name)
+    Recmodel = model.RecMF(world.config)
+    Varmodel = model.LightGCN_xij_item_personal(world.config, dataset)
+    elbo = utils.ELBO(world.config, rec_model=Recmodel, var_model=Varmodel, no_var_decay=True)
+    sampler_gamma_save = utils.sample_for_basic_GMF_loss(k=9)
 
 
 
@@ -148,7 +157,7 @@ world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
 
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("./output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter("./output/"+ "batch_386054_var/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
 try:
@@ -160,18 +169,103 @@ try:
             output_information = TrainProcedure.Alldata_train_set_gamma_cross_entrophy(dataset, Recmodel, elbo, i, w)
         elif world.sampling_type == SamplingAlgorithms.all_data_MF_MF:
             output_information = TrainProcedure.all_data_MF_MF(dataset, Recmodel, Varmodel, elbo, i, w)
+            if i == 50:
+                print("save gamma")
+                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=9)
+                users = users.to(world.device)
+                items = items.to(world.device)
+                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                rating = Recmodel(users, items)
+                gamma = Varmodel(users, items)
+                np.savetxt('mf_gamma1.txt', np.array(gamma.cpu().detach().numpy()))
+                np.savetxt('mf_rating1.txt', np.array(rating.cpu().detach().numpy()))
+                np.savetxt('mf_x1.txt', np.array(xij))
+                print('save ok')
+            elif i == 150:
+                print("save gamma")
+                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=9)
+                users = users.to(world.device)
+                items = items.to(world.device)
+                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+
+                gamma = Varmodel(users, items)
+                np.savetxt('lgn_gamma2.txt', np.array(gamma.cpu().detach().numpy()))
+                np.savetxt('lgn_x.txt2', np.array(xij))
         elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
             output_information = TrainProcedure.all_data_LGN_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
+            if i == 50:
+                with torch.no_grad():
+                    print("save1")
+                    users, items = sampler_gamma_save.sampleForEpoch(dataset, k=9)
+                    users = users.to(world.device)
+                    items = items.to(world.device)
+                    xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                    rating = Recmodel(users, items)
+                    gamma = Varmodel(users, items)
+                    np.savetxt('lgn_rating1.txt', np.array(rating.cpu().numpy()))
+                    np.savetxt('lgn_gamma1.txt', np.array(gamma.cpu().numpy()))
+                    np.savetxt('rg1.txt', np.array(gamma.cpu().numpy()*rating.cpu().numpy()))
+                    np.savetxt('lgn_x1.txt', np.array(xij))
 
+            elif i == 150:
+                with torch.no_grad():
+                    print("save2")
+                    users, items = sampler_gamma_save.sampleForEpoch(dataset, k=9)
+                    users = users.to(world.device)
+                    items = items.to(world.device)
+                    xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                    rating = Recmodel(users, items)
+                    gamma = Varmodel(users, items)
+                    np.savetxt('lgn_rating2.txt', np.array(rating.cpu().numpy()))
+                    np.savetxt('lgn_gamma2.txt', np.array(gamma.cpu().numpy()))
+                    np.savetxt('rg2.txt', np.array(gamma.cpu().numpy()*rating.cpu().numpy()))
+                    np.savetxt('lgn_x2.txt', np.array(xij))
+            elif i == 290:
+                with torch.no_grad():
+                    print("save3")
+                    users, items = sampler_gamma_save.sampleForEpoch(dataset, k=9)
+                    users = users.to(world.device)
+                    items = items.to(world.device)
+                    xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                    rating = Recmodel(users, items)
+                    gamma = Varmodel(users, items)
+                    np.savetxt('lgn_rating3.txt', np.array(rating.cpu().numpy()))
+                    np.savetxt('lgn_gamma3.txt', np.array(gamma.cpu().numpy()))
+                    np.savetxt('rg3.txt', np.array(gamma.cpu().numpy()*rating.cpu().numpy()))
+                    np.savetxt('lgn_x3.txt', np.array(xij))
         elif world.sampling_type == SamplingAlgorithms.all_data_MFxij_MF or \
             world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF or \
             world.sampling_type == SamplingAlgorithms.all_data_MFitemPer_MF or \
             world.sampling_type == SamplingAlgorithms.all_data_MFSymPer_MF:
+
             output_information = TrainProcedure.all_data_MFxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
+            if i == 198:
+                print("save gamma")
+                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=9)
+                users =users.to(world.device)
+                items = items.to(world.device)
+                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                xij = torch.tensor(xij).to(world.device)
+
+                gamma = Varmodel(users, items, xij)
+                np.savetxt('mf_xij_gamma1.txt', np.array(gamma.cpu().detach().numpy()))
+                np.savetxt('mf_xij_x1.txt', np.array(xij.cpu().detach().numpy()))
 
         elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF or \
-            world.sampling_type == SamplingAlgorithms.all_data_LGNxij2_MF:
+            world.sampling_type == SamplingAlgorithms.all_data_LGNitemPer_MF:
+
             output_information = TrainProcedure.all_data_LGNxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
+            if i == 190:
+                print("save gamma")
+                users, items = sampler_gamma_save.sampleForEpoch(dataset, k=9)
+                users = users.to(world.device)
+                items = items.to(world.device)
+                xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
+                xij = torch.tensor(xij).to(world.device)
+
+                gamma = Varmodel(users, items, xij)
+                np.savetxt('lgn_xij_gamma.txt', np.array(gamma.cpu().detach().numpy()))
+                np.savetxt('lgn_xij_x.txt', np.array(xij.cpu().detach().numpy()))
 
         elif world.sampling_type == SamplingAlgorithms.Sample_all_dataset:
             epoch_k = dataset.trainDataSize * 4
@@ -185,11 +279,11 @@ try:
         torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
         if globals().get('Varmodel'):
             torch.save(Varmodel.state_dict(), f"../checkpoints/Var-{world.sampling_type.name}.pth.tar")
-        if i%3 == 0 and i != 0:
+        if i%2 == 0 and i!=0:
             # test
             bar.set_description("[TEST]")
             testDict = dataset.getTestDict()
-            TrainProcedure.Test(dataset, Recmodel, world.top_k, i, w)
+            TrainProcedure.Test(dataset, Recmodel, Varmodel, world.top_k, i, w)
 finally:
     if world.tensorboard:
         w.close()
