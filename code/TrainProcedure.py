@@ -126,38 +126,10 @@ def all_data_LGN_MF(dataset, recommend_model, var_model, loss_class, epoch, w=No
 
     return f"[ALL[{datalen}]]"
 
-
-def all_data_MFxij_MF_nobatch(dataset, recommend_model, var_model, loss_class, epoch, w=None):
-    Recmodel: model.RecMF = recommend_model
-    Varmodel: model.VarMF_xij = var_model
-    loss_class: utils.ELBO
-
-
-    (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
-    epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
-    datalen = len(epoch_users)
-    Recmodel.train()
-    Varmodel.eval()
-    rating = Recmodel(epoch_users, epoch_items )
-    gamma = Varmodel(epoch_users, epoch_items, epoch_xij)
-    loss1 = loss_class.stageOne(rating, epoch_xij, gamma)
-    
-    Recmodel.eval()
-    Varmodel.train()
-    rating = Recmodel(epoch_users, epoch_items )
-    gamma = Varmodel(epoch_users, epoch_items, epoch_xij)
-    loss2 = loss_class.stageTwo(rating, gamma, epoch_xij)
-    if world.tensorboard:
-        w.add_scalar(f'all_data_MFxij_MF/stageOne', loss1, epoch)
-        w.add_scalar(f'all_data_MFxij_MF/stageTwo', loss2, epoch)
-    print("[loss:]", loss1 + loss2)
-
-    
-
 def all_data_MFxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w=None):
-    print('begin all_data_MFxij_MF!')
+    print('begin all_data_MFitemPer_MF!')
     Recmodel: model.RecMF = recommend_model
-    Varmodel: model.VarMF_xij = var_model
+    Varmodel: model.VarMF_xij_item_personal = var_model
     loss_class: utils.ELBO
 
 
@@ -183,15 +155,15 @@ def all_data_MFxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w=
         loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
 
         if world.tensorboard:
-            w.add_scalar(f'all_data_MFxij_MF/stageOne', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
-            w.add_scalar(f'all_data_MFxij_MF/stageTwo', loss2, epoch*round(datalen/world.config['batch_size']) + batch_i)
+            w.add_scalar(f'all_data_MFitemPer_MF/stageOne', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
+            w.add_scalar(f'all_data_MFitemPer_MF/stageTwo', loss2, epoch*round(datalen/world.config['batch_size']) + batch_i)
 
-    print('end all_data_MFxij_MF!')
+    print('end all_data_MFitemPer_MF!')
 
     return f"[ALL[{datalen}]]"
 
 def all_data_LGNxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w=None):
-    print('begin all_data_LGNxij_MF!')
+    print('begin LightGCN_xij_item_personal!')
     Recmodel: model.RecMF = recommend_model
     Varmodel: model.LightGCN_xij = var_model
     loss_class: utils.ELBO
@@ -220,10 +192,10 @@ def all_data_LGNxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w
         loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, reg_loss=reg_loss)
 
         if world.tensorboard:
-            w.add_scalar(f'all_data_LGNxij_MF/stageOne', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
-            w.add_scalar(f'all_data_LGNxij_MF/stageTwo', loss2, epoch*round(datalen/world.config['batch_size']) + batch_i)
+            w.add_scalar(f'LightGCN_xij_item_personal/stageOne', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
+            w.add_scalar(f'LightGCN_xij_item_personal/stageTwo', loss2, epoch*round(datalen/world.config['batch_size']) + batch_i)
 
-    print('end all_data_LGNxij_MF!')
+    print('end LightGCN_xij_item_personal!')
 
     return f"[ALL[{datalen}]]"
     
@@ -268,21 +240,25 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
             w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch*world.config['total_batch'] + batch_i)
     return f"Sparsity {np.sum(epoch_xij)/len(epoch_xij):.3f}"
 
-def Test(dataset, Recmodel, Varmodel,top_k, epoch, w=None):
+def Test(dataset, Recmodel, Varmodel, top_k, epoch, w=None):
      dataset : utils.BasicDataset
      testDict : dict = dataset.getTestDict()
      Recmodel : model.RecMF
+     Varmodel : model.LightGCN
      with torch.no_grad():
          Recmodel.eval()
          Varmodel.eval()
          users = list(testDict.keys())
          users_tensor = torch.Tensor(list(testDict.keys())).to(world.device)
+         #print(users_tensor)
          GroundTrue = [testDict[user] for user in users_tensor.cpu().numpy()]
-         rating = Recmodel.getUsersRating(users_tensor)
          rating1 = Recmodel.getUsersRating(users_tensor)
          rating2 = Varmodel.allGamma(users_tensor)
          rating = rating1*rating2
          rating = rating.cpu()
+         #print(rating1, rating2, rating)
+
+
          # exclude positive train data
          allPos = dataset.getUserPosItems(users)
          exclude_index = []
@@ -305,6 +281,7 @@ def Test(dataset, Recmodel, Varmodel,top_k, epoch, w=None):
              w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
              w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
              w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
+
 
 """def test_one_batch(X):
     sorted_items = X[0].numpy()

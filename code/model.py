@@ -260,9 +260,13 @@ class VarMF_xij_item_personal(nn.Module):
         users_emb = self.embedding_user(users.long())
         items_emb = self.embedding_item(items.long())
         # xij_emb = self.embedding_xij(xij.long())
-        xij_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
-        xij_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
-        xij_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
+        xij_emb1 = self.embedding_item_xij1(items.long())
+        xij_emb0 = self.embedding_item_xij0(items.long())
+        xij_emb = xij_emb1 * xij.reshape(-1, 1) + xij_emb0 * (1 - xij.reshape(-1, 1))
+
+        # xij_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
+        # xij_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
+        # xij_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
 
         # users_emb = self.sig(torch.cat([users_emb, xij_emb], dim=1))
         users_emb = self.sig(users_emb)
@@ -317,11 +321,11 @@ class VarMF_xij_Symmetric_personal(nn.Module):
         users_emb = self.embedding_user(users.long())
         items_emb = self.embedding_item(items.long())
         
-        xij_item_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
+        xij_item_emb = torch.zeros(len(xij), self.xij_dim)
         xij_item_emb[xij.bool()]  = self.embedding_item_xij1(items[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
 
-        xij_user_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
+        xij_user_emb = torch.zeros(len(xij), self.xij_dim)
         xij_user_emb[xij.bool()] = self.embedding_user_xij1(users[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_user_xij0(users[~xij.bool()].long())
 
@@ -440,8 +444,10 @@ class LightGCN(nn.Module):
         gamma = self.forward(users, items)
         userEmb_ego = self.embedding_user(users)
         itemEmb_ego = self.embedding_item(items)
-        reg_loss = (1/2)*self.weight_decay*(torch.norm(userEmb_ego, 2).pow(2) + torch.norm(itemEmb_ego, 2).pow(2))
-        reg_loss = reg_loss/float(len(users))
+        reg_loss = (1 / 2) * self.weight_decay * (1/self.num_items*torch.sum(userEmb_ego.reshape(1, -1) ** 2) + 1/self.num_users*torch.sum(itemEmb_ego.reshape(1, -1) ** 2))
+        # reg_loss = reg_loss/float(len(users))
+        #reg_loss = (1/2)*self.weight_decay*(torch.norm(userEmb_ego, 2).pow(2) + torch.norm(itemEmb_ego, 2).pow(2))
+        #reg_loss = reg_loss/float(len(users))
         return gamma, reg_loss
     
     def forward(self, users, items):
