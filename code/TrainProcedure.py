@@ -268,16 +268,20 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
             w.add_scalar(f'SamplerLoss/stageTwo', loss2, epoch*world.config['total_batch'] + batch_i)
     return f"Sparsity {np.sum(epoch_xij)/len(epoch_xij):.3f}"
 
-def Test(dataset, Recmodel, top_k, epoch, w=None):
+def Test(dataset, Recmodel, Varmodel,top_k, epoch, w=None):
      dataset : utils.BasicDataset
      testDict : dict = dataset.getTestDict()
      Recmodel : model.RecMF
      with torch.no_grad():
          Recmodel.eval()
+         Varmodel.eval()
          users = list(testDict.keys())
          users_tensor = torch.Tensor(list(testDict.keys())).to(world.device)
          GroundTrue = [testDict[user] for user in users_tensor.cpu().numpy()]
          rating = Recmodel.getUsersRating(users_tensor)
+         rating1 = Recmodel.getUsersRating(users_tensor)
+         rating2 = Varmodel.allGamma(users_tensor)
+         rating = rating1*rating2
          rating = rating.cpu()
          # exclude positive train data
          allPos = dataset.getUserPosItems(users)
