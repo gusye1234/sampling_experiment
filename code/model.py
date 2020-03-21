@@ -22,6 +22,8 @@ class RecMF(nn.Module):
             num_embeddings=self.num_users, embedding_dim=self.latent_dim)
         self.embedding_item = torch.nn.Embedding(
             num_embeddings=self.num_items, embedding_dim=self.latent_dim)
+        self.embedding_user.weight.data *= 0.1
+        self.embedding_item.weight.data *= 0.1
         self.f = nn.Sigmoid()
     
     def getUsersRating(self, users):
