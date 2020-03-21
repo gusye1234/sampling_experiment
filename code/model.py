@@ -354,7 +354,11 @@ class LightGCN(nn.Module):
         self.latent_dim = self.config['latent_dim_var']
         self.embedding_user = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.latent_dim)
         self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
+        nn.init.xavier_uniform_(self.embedding_user.weight, gain=1)
+        nn.init.xavier_uniform_(self.embedding_item.weight, gain=1)
+        print('use xavier initilizer')
 
+    
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
         self.drop = self.config['dropout']
@@ -483,7 +487,10 @@ class LightGCN_xij(nn.Module):
         self.embedding_user = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.latent_dim)
         self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
         self.embedding_xij = torch.nn.Embedding(num_embeddings=self.num_xij, embedding_dim=self.xij_dim)
-
+        nn.init.xavier_uniform_(self.embedding_user.weight, gain=1)
+        nn.init.xavier_uniform_(self.embedding_item.weight, gain=1)
+        print('use xavier initilizer')
+        
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
         self.drop      = self.config['dropout']
@@ -571,7 +578,10 @@ class LightGCN_xij2(nn.Module):
         self.embedding_user = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.latent_dim)
         self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
         self.embedding_xij = torch.nn.Embedding(num_embeddings=2, embedding_dim=self.xij_dim)
-
+        nn.init.xavier_uniform_(self.embedding_user.weight, gain=1)
+        nn.init.xavier_uniform_(self.embedding_item.weight, gain=1)
+        print('use xavier initilizer')
+        
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
         self.drop      = self.config['dropout']
@@ -659,7 +669,10 @@ class LightGCN_xij_Symmetric_nopersonal(nn.Module):
         self.embedding_user_xij2 = torch.nn.Embedding(2, embedding_dim=self.xij_dim)
         self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
         self.embedding_item_xij2 = torch.nn.Embedding(2, embedding_dim=self.xij_dim)
-
+        nn.init.xavier_uniform_(self.embedding_user.weight, gain=1)
+        nn.init.xavier_uniform_(self.embedding_item.weight, gain=1)
+        print('use xavier initilizer')
+        
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
         self.drop      = self.config['dropout']
@@ -735,6 +748,10 @@ class LightGCN_xij_item_personal(nn.Module):
         self.xij_dim = self.config['xij_dim']
         self.embedding_user = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.latent_dim)
         self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
+        nn.init.xavier_uniform_(self.embedding_user.weight, gain=1)
+        nn.init.xavier_uniform_(self.embedding_item.weight, gain=1)
+        print('use xavier initilizer')
+        
         self.embedding_user_xij = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.xij_dim)
         self.embedding_item_xij1 = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.xij_dim)
         self.embedding_item_xij0 = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.xij_dim)
