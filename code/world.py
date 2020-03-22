@@ -21,7 +21,7 @@ class SamplingAlgorithms(Enum):
   all_data_MFxij2_MF = 9
   all_data_MFitemPer_MF = 10
   all_data_MFSymPer_MF = 11
-  all_data_LGNitemPer_MF = 12
+  all_data_LGNitemPer_MF_no_batch = 12
   
 types = list(SamplingAlgorithms)  
   
