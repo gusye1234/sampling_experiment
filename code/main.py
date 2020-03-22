@@ -157,7 +157,7 @@ world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
 
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("./output/"+ "batch_386054_var/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter("/output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
 try:
@@ -241,10 +241,10 @@ try:
 
 
         bar.set_description(output_information)
-        torch.save(Recmodel.state_dict(), f"../checkpoints/Rec-{world.sampling_type.name}.pth.tar")
+        torch.save(Recmodel.state_dict(), f"/output/checkpoints/Rec-{world.sampling_type.name}.pth.tar")
         if globals().get('Varmodel'):
-            torch.save(Varmodel.state_dict(), f"../checkpoints/Var-{world.sampling_type.name}.pth.tar")
-        if i%2 == 0 and i!=0:
+            torch.save(Varmodel.state_dict(), f"/output/checkpoints/Var-{world.sampling_type.name}.pth.tar")
+        if i%50 == 0 :
             # test
             bar.set_description("[TEST]")
             testDict = dataset.getTestDict()
