@@ -198,6 +198,45 @@ def all_data_LGNxij_MF(dataset, recommend_model, var_model, loss_class, epoch, w
     print('end LightGCN_xij_item_personal!')
 
     return f"[ALL[{datalen}]]"
+
+def all_data_LGNxij_MF_no_batch(dataset, recommend_model, var_model, loss_class, epoch, w=None):
+    print('begin LightGCN_xij_item_personal!')
+    Recmodel: model.RecMF = recommend_model
+    Varmodel: model.LightGCN_xij_item_personal = var_model
+    loss_class: utils.ELBO
+
+
+    (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
+    #epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
+    datalen = len(epoch_users)
+
+    epoch_users = epoch_users.to(world.device)
+    epoch_items = epoch_items.to(world.device)
+    epoch_xij = epoch_xij.to(world.device)
+
+    Recmodel.train()
+    Varmodel.eval()
+    rating = Recmodel(epoch_users, epoch_items)
+    epoch_gamma = Varmodel(epoch_users, epoch_items, epoch_xij)
+    loss1 = loss_class.stageOne(rating, epoch_xij, epoch_gamma)
+
+    Recmodel.eval()
+    Varmodel.train()
+    rating = Recmodel(epoch_users, epoch_items)
+    epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
+    # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
+    loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+    if epoch % 50 == 0:
+        np.savetxt(f'/output/lgn_xij_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_xij_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_xij_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))
+    if world.tensorboard:
+        w.add_scalar(f'LightGCN_xij_item_personal/stageOne', loss1, epoch)
+        w.add_scalar(f'LightGCN_xij_item_personal/stageTwo', loss2, epoch)
+
+    print('end LightGCN_xij_item_personal!')
+
+    return f"[ALL[{datalen}]]"
     
 def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch_k, epoch,w):
     # global users_set, items_set
