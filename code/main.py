@@ -193,19 +193,6 @@ try:
                 np.savetxt('lgn_x.txt2', np.array(xij))
         elif world.sampling_type == SamplingAlgorithms.all_data_LGN_MF:
             output_information = TrainProcedure.all_data_LGN_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
-            elif i == 150:
-                with torch.no_grad():
-                    print("save2")
-                    users, items = sampler_gamma_save.sampleForEpoch(dataset, k=9)
-                    users = users.to(world.device)
-                    items = items.to(world.device)
-                    xij = dataset.getUserItemFeedback(users.cpu().numpy(), items.cpu().numpy()).astype('int')
-                    rating = Recmodel(users, items)
-                    gamma = Varmodel(users, items)
-                    np.savetxt('lgn_rating2.txt', np.array(rating.cpu().numpy()))
-                    np.savetxt('lgn_gamma2.txt', np.array(gamma.cpu().numpy()))
-                    np.savetxt('rg2.txt', np.array(gamma.cpu().numpy()*rating.cpu().numpy()))
-                    np.savetxt('lgn_x2.txt', np.array(xij))
         
         elif world.sampling_type == SamplingAlgorithms.all_data_MFxij_MF or \
             world.sampling_type == SamplingAlgorithms.all_data_MFxij2_MF or \
@@ -225,8 +212,7 @@ try:
                 np.savetxt('mf_xij_gamma1.txt', np.array(gamma.cpu().detach().numpy()))
                 np.savetxt('mf_xij_x1.txt', np.array(xij.cpu().detach().numpy()))
 
-        elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF or \
-            world.sampling_type == SamplingAlgorithms.all_data_LGNitemPer_MF:
+        elif world.sampling_type == SamplingAlgorithms.all_data_LGNxij_MF:
 
             output_information = TrainProcedure.all_data_LGNxij_MF(dataset, Recmodel, Varmodel, elbo, i, w=w)
         elif world.sampling_type == SamplingAlgorithms.all_data_LGNitemPer_MF_no_batch :
