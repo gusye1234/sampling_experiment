@@ -62,8 +62,8 @@ try:
         start = time.time()
         print(f'===============[EPOCH {i}]=================')
         # training
-        # output_information = train_method(dataset, Recmodel, Varmodel, elbo, i, w)
-        # print(output_information)
+        output_information = train_method(dataset, Recmodel, Varmodel, elbo, i, w)
+        print(output_information)
         
         # save
         torch.save(Recmodel.state_dict(), os.path.join(world.PATH, f'Rec_{flag}.pth.tar'))
