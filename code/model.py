@@ -487,6 +487,7 @@ class LightGCN_xij(nn.Module):
         self.num_xij = self.config['num_xij']
         self.latent_dim = self.config['latent_dim_var']
         self.xij_dim = self.config['xij_dim']
+        self.weight_decay = self.config['var_weight_decay']
         self.embedding_user = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.latent_dim)
         self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
         self.embedding_xij = torch.nn.Embedding(num_embeddings=self.num_xij, embedding_dim=self.xij_dim)
@@ -578,6 +579,7 @@ class LightGCN_xij2(nn.Module):
         self.num_xij = self.config['num_xij']
         self.latent_dim = self.config['latent_dim_var']
         self.xij_dim = self.config['xij_dim']
+        self.weight_decay = self.config['var_weight_decay']
         self.embedding_user = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.latent_dim)
         self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
         self.embedding_xij = torch.nn.Embedding(num_embeddings=2, embedding_dim=self.xij_dim)
@@ -772,14 +774,10 @@ class LightGCN_xij_item_personal_single(nn.Module):
         xij_item_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
         
-        print('user1',users_emb)
-        print(self.w_user)
         users_emb = self.w_user*users_emb
         items_emb = self.w_item*items_emb
-        print('user2', users_emb)
         users_emb = self.soft(torch.cat([users_emb, xij_user_emb], dim=1))
         items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
-        print('user3', users_emb)
 
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
@@ -905,14 +903,10 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         xij_item_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
         
-        print('user1',users_emb)
-        print(self.w_user)
         users_emb = self.w_user(users_emb)
         items_emb = self.w_item(items_emb)
-        print('user2', users_emb)
         users_emb = self.soft(torch.cat([users_emb, xij_user_emb], dim=1))
         items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
-        print('user3', users_emb)
 
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)

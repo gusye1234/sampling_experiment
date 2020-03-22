@@ -125,6 +125,7 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
     Varmodel.train()
     rating = Recmodel(epoch_users, epoch_items)
     if lgn:
+        print('lgn reg')
         epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
         # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
         loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)

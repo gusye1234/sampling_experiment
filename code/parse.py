@@ -5,9 +5,9 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run sampling")
-    parser.add_argument('--recdim', type=int,default=16,
+    parser.add_argument('--recdim', type=int,default=10,
                         help="the embedding size of recmodel")
-    parser.add_argument('--vardim', type=int,default=32,
+    parser.add_argument('--vardim', type=int,default=16,
                         help="the embedding size of varmodel")
     parser.add_argument('--reclr', type=float,default=0.01,
                         help="learning rate for rec model")
@@ -34,8 +34,8 @@ def parse_args():
     parser.add_argument('--comment', type=str,default="lgn")
     parser.add_argument('--load', type=bool,default=False)
     parser.add_argument('--epochs', type=int,default=100)
-    parser.add_argument('--vartype', type=int,default=1,
+    parser.add_argument('--vartype', type=int,
                         help="var model types")
-    parser.add_argument('--sampletype', type=int,default=1,
+    parser.add_argument('--sampletype', type=int,
                         help="sampling methods types")
     return parser.parse_args()
