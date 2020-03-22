@@ -22,10 +22,12 @@ def all_data(dataset, recommend_model, var_model, loss_class, epoch, w=None):
     Recmodel = recommend_model
     Varmodel = var_model
     loss_class: utils.ELBO
-
+    lgn = world.var_type.startswith('lgn')
+    
     (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
     epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
     datalen = len(epoch_users)
+    
     for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
         batch_users = batch_users.to(world.device)
         batch_items = batch_items.to(world.device)
@@ -41,8 +43,12 @@ def all_data(dataset, recommend_model, var_model, loss_class, epoch, w=None):
         Recmodel.eval()
         Varmodel.train()
         rating = Recmodel(batch_users, batch_items)
-        batch_gamma = Varmodel(batch_users, batch_items)
-        loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
+        if lgn:
+            batch_gamma, reg_loss = Varmodel.forwardWithReg(batch_users, batch_items)
+            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, reg_loss=reg_loss)
+        else:
+            batch_gamma = Varmodel(batch_users, batch_items)
+            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
 
         if world.tensorboard:
             w.add_scalar(flag+"/stageone", loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
@@ -58,11 +64,12 @@ def all_data_xij(dataset, recommend_model, var_model, loss_class, epoch, w=None)
     Recmodel = recommend_model
     Varmodel = var_model
     loss_class: utils.ELBO
-
-
+    lgn = world.var_type.startswith('lgn')
+    
     (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
     epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
     datalen = len(epoch_users)
+    
     for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
         batch_users = batch_users.to(world.device)
         batch_items = batch_items.to(world.device)
@@ -78,8 +85,13 @@ def all_data_xij(dataset, recommend_model, var_model, loss_class, epoch, w=None)
         Recmodel.eval()
         Varmodel.train()
         rating = Recmodel(batch_users, batch_items)
-        batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
-        loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
+        
+        if lgn:
+            batch_gamma, reg_loss = Varmodel.forwardWithReg(batch_users, batch_items, batch_xij)
+            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, reg_loss=reg_loss)
+        else:
+            batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
+            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
 
         if world.tensorboard:
             w.add_scalar(flag+'/stageone', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
@@ -93,7 +105,7 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
     Recmodel = recommend_model
     Varmodel = var_model
     loss_class: utils.ELBO
-
+    lgn = world.var_type.startswith('lgn')
 
     (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
     epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
@@ -112,13 +124,19 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
     Recmodel.eval()
     Varmodel.train()
     rating = Recmodel(epoch_users, epoch_items)
-    epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
-    # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
-    loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+    if lgn:
+        epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
+        # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
+        loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+    else:
+        epoch_gamma = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
+        loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij)
+    
     if epoch % 50 == 0:
         np.savetxt(f'/output/lgn_xij_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))
+    
     if world.tensorboard:
         w.add_scalar(flag + '/stageOne', loss1, epoch)
         w.add_scalar(flag + '/stageTwo', loss2, epoch)
@@ -241,49 +259,3 @@ def Test(dataset, Recmodel, Varmodel, top_k, epoch, w=None):
              w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
              w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
              w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
-
-
-# def Test(dataset, Recmodel, Varmodel, top_k, epoch, w=None):
-#      dataset : utils.BasicDataset
-#      testDict : dict = dataset.getTestDict()
-#      Recmodel : model.RecMF
-#      Varmodel : model.LightGCN
-#      with torch.no_grad():
-#          Recmodel.eval()
-#          Varmodel.eval()
-#          users = list(testDict.keys())
-#          users_tensor = torch.Tensor(list(testDict.keys())).to(world.device)
-#          #print(users_tensor)
-#          GroundTrue = [testDict[user] for user in users_tensor.cpu().numpy()]
-#          rating1 = Recmodel.getUsersRating(users_tensor)
-#          rating2 = Varmodel.allGamma(users_tensor)
-#          rating = rating1*rating2
-#          rating = rating.cpu()
-#          #print(rating1, rating2, rating)
-
-
-#          # exclude positive train data
-#          allPos = dataset.getUserPosItems(users)
-#          exclude_index = []
-#          exclude_items = []
-#          for range_i, items in enumerate(allPos):
-#             exclude_index.extend([range_i]*len(items))
-#             exclude_items.extend(items)
-#          rating[exclude_index, exclude_items] = 0.
-#          # assert torch.all(rating >= 0.)
-#          # assert torch.all(rating <= 1.)
-#          # end excluding
-#          _, top_items = torch.topk(rating, top_k)
-#          top_items = top_items.cpu().numpy()
-#          metrics = utils.recall_precisionATk(GroundTrue, top_items, top_k)
-#          metrics['mrr'] = utils.MRRatK(GroundTrue, top_items, top_k)
-#          metrics['ndcg'] = utils.NDCGatK(GroundTrue, top_items, top_k)
-#          print(metrics)
-#          if world.tensorboard:
-#              w.add_scalar(f'Test/Recall@{top_k}', metrics['recall'], epoch)
-#              w.add_scalar(f'Test/Precision@{top_k}', metrics['precision'], epoch)
-#              w.add_scalar(f'Test/MRR@{top_k}', metrics['mrr'], epoch)
-#              w.add_scalar(f'Test/NDCG@{top_k}', metrics['ndcg'], epoch)
-
-
-

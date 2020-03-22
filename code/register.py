@@ -12,6 +12,10 @@ Rec_register = {
     'mf': model.RecMF
 }
 
+NOTE = """
+    Any Var model should implement `allGamma` methods.
+"""
+
 Var_register = {
     'mf': model.VarMF_reg,
     'mf_xij': model.VarMF_xij,

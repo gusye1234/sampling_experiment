@@ -26,7 +26,7 @@ class ELBO:
     eps = torch.Tensor([1e-8]).float().to(world.device)
 
     def __init__(self, config,
-                 rec_model, var_model, no_var_decay = False):
+                 rec_model, var_model):
         rec_model: nn.Module
         var_model: nn.Module
         self.epsilon = torch.Tensor([config['epsilon']]).to(world.device)
@@ -35,7 +35,8 @@ class ELBO:
         rec_lr = config['rec_lr']
         var_lr = config['var_lr']
         self.optFortheta = optim.Adam(rec_model.parameters(), lr=rec_lr, weight_decay=config['rec_weight_decay'])
-        if no_var_decay:
+        self.no_var_decay = world.var_type.startswith('lgn')
+        if self.no_var_decay:
             self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr)    
         else:
             self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr, weight_decay=config['var_weight_decay'])
