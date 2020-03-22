@@ -34,7 +34,8 @@ def parse_args():
     parser.add_argument('--comment', type=str,default="lgn")
     parser.add_argument('--load', type=bool,default=False)
     parser.add_argument('--epochs', type=int,default=100)
-    parser.add_argument('--type', type=int,default=1,
-                        help="training procedure types, ranging from 1 to 11")
-    
+    parser.add_argument('--vartype', type=int,default=1,
+                        help="var model types")
+    parser.add_argument('--sampletype', type=int,default=1,
+                        help="sampling methods types")
     return parser.parse_args()

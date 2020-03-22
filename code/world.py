@@ -9,23 +9,42 @@ from parse import parse_args
 
 args = parse_args()
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-class SamplingAlgorithms(Enum):
-  Alldata_train_set_gamma_cross_entrophy   = 1 # it sucks
-  all_data_MF_MF      = 2
-  all_data_LGN_MF     = 3
-  all_data_MFxij_MF   = 4
-  all_data_LGNxij_MF  = 5
-  Sample_all_dataset  = 6
-  Sample_positive_all = 7
-  all_data_LGNxij2_MF = 8
-  all_data_MFxij2_MF = 9
-  all_data_MFitemPer_MF = 10
-  all_data_MFSymPer_MF = 11
-  all_data_LGNitemPer_MF_no_batch = 12
-  
-types = list(SamplingAlgorithms)  
-  
-sampling_type = types[args.type-1]
+
+Recmodels = {
+  1:"mf",
+}
+
+Varmodels = {
+  1:'mf',
+  2:'mf_xij',
+  3:'mf_xij2',
+  4:'mf_itemper',
+  5:'mf_symper',
+  6:'mf_itemper_matrix',
+  7:'lgn',
+  8:'lgn_xij',
+  9:'lgn_xij2',
+  10:'lgn_itemper_single',
+  11:'lgn_itemper_matrix'
+}
+
+losses = {
+  1: 'elbo'
+}
+
+samplings = {
+  1: 'all_data',
+  2: 'all_data_xij',
+  3: 'all_data_nobatch',
+  4: 'all_data_nobatch_xij',
+  5: 'fast_samping', # not yet,
+}
+
+
+rec_type = Recmodels[1]
+var_type = Varmodels[args.vartype]
+loss_type = losses[1]
+sample_type = samplings[args.sampletype]
 
 
 
@@ -56,7 +75,7 @@ LOAD = False
 PATH = '../checkpoints'
 top_k = 5
 topks = 5
-comment = f"MF_{sampling_type.name}"
+comment = f"{sample_type}_{rec_type}_{var_type}"
 tensorboard = True
 GPU = torch.cuda.is_available()
 device = torch.device('cuda' if GPU else "cpu")
