@@ -108,7 +108,6 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
     lgn = world.var_type.startswith('lgn')
 
     (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
-    epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
     datalen = len(epoch_users)
 
     epoch_users = epoch_users.to(world.device)
@@ -137,6 +136,11 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
         np.savetxt(f'/output/lgn_xij_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))
+        user_emb, item_emb0, item_emb1 = Varmodel.get_user_item_embedding()
+        np.savetxt(f'/output/lgn_xij_user_emb{epoch}.txt', np.array(user_emb.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_xij_item_emb0_{epoch}.txt', np.array(item_emb0.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_xij_item_emb1_{epoch}.txt', np.array(item_emb1.cpu().detach().numpy()))
+
     
     if world.tensorboard:
         w.add_scalar(flag + '/stageOne', loss1, epoch)

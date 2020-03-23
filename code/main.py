@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 from pprint import pprint
 import os
 import time
-
+import register
 # loading data...
 dataset   = dataloader.LastFM()
 lm_loader = DataLoader(dataset, batch_size=world.config['batch_size'], shuffle=True, drop_last=True) 
@@ -32,7 +32,7 @@ world.config['dataset'] = dataset
 
 
 # initialize models
-import register
+
 Recmodel = register.Rec_register[world.rec_type](world.config)
 Varmodel = register.Var_register[world.var_type](world.config)
 train_method = register.sampling_register[world.sample_type]
@@ -49,10 +49,12 @@ sampler_gamma_save = utils.sample_for_basic_GMF_loss(k=3)
 # train
 Neg_k = 1
 world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
-
+Recmodel = Recmodel.to(world.device)
+if globals().get('Varmodel'):
+    Varmodel = Varmodel.to(world.device)
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("./output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter("/output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
     
@@ -66,10 +68,10 @@ try:
         print(output_information)
         
         # save
-        torch.save(Recmodel.state_dict(), os.path.join(world.PATH, f'Rec_{flag}.pth.tar'))
-        torch.save(Varmodel.state_dict(), os.path.join(world.PATH, f'Var_{flag}.pth.tar'))
+        #torch.save(Recmodel.state_dict(), os.path.join(world.PATH, f'Rec_{flag}.pth.tar'))
+        #torch.save(Varmodel.state_dict(), os.path.join(world.PATH, f'Var_{flag}.pth.tar'))
         # test
-        if i%10 == 0 :
+        if i%25 == 0 :
             print('[TEST]')
             testDict = dataset.getTestDict()
             TrainProcedure.Test(dataset, Recmodel, Varmodel, world.top_k, i, w)

@@ -13,6 +13,8 @@ def parse_args():
                         help="learning rate for rec model")
     parser.add_argument('--varlr', type=float,default=0.01,
                         help="learning rate for var model")
+    parser.add_argument('--xdecay', type=float,default=0.1,
+                        help="weight decay for var model")
     parser.add_argument('--vardecay', type=float,default=0.001,
                         help="weight decay for var model")
     parser.add_argument('--recdecay', type=float,default=0.001,

@@ -62,6 +62,7 @@ config['rec_lr'] = args.reclr
 config['var_lr'] = args.varlr
 config['rec_weight_decay'] = args.recdecay
 config['var_weight_decay'] = args.vardecay
+config['x_weight_decay'] = args.xdecay
 config['lightGCN_n_layers']= args.layer
 # ===============================
 config['batch_size'] = 32768
@@ -70,7 +71,7 @@ config['test_u_batch_size'] = 100
 config['xij_dim'] = 1
 config['num_xij'] = 1
 # ======================
-TRAIN_epochs = 200
+TRAIN_epochs = 1201
 LOAD = False
 PATH = '../checkpoints'
 top_k = 5
@@ -91,14 +92,3 @@ simplefilter(action="ignore", category=FutureWarning)
 
 
 
-logo = r"""
-███████╗ █████╗ ███╗   ███╗██████╗ ██╗     ██╗███╗   ██╗ ██████╗ 
-██╔════╝██╔══██╗████╗ ████║██╔══██╗██║     ██║████╗  ██║██╔════╝ 
-███████╗███████║██╔████╔██║██████╔╝██║     ██║██╔██╗ ██║██║  ███╗
-╚════██║██╔══██║██║╚██╔╝██║██╔═══╝ ██║     ██║██║╚██╗██║██║   ██║
-███████║██║  ██║██║ ╚═╝ ██║██║     ███████╗██║██║ ╚████║╚██████╔╝
-╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝     ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ 
-"""
-# font: ANSI Shadow
-# refer to http://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=Sampling
-print(logo)
