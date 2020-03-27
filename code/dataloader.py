@@ -43,7 +43,7 @@ class LastFM(BasicDataset):
     Incldue graph information
     LastFM dataset
     """
-    def __init__(self, path="../data/samwalk_data"):
+    def __init__(self, path="/data/HungPaan/lastfm/"):
         # train or test
         self.mode_dict = {'train':0, "test":1}
         self.mode    = self.mode_dict['train']
@@ -112,7 +112,7 @@ class LastFM(BasicDataset):
             index = dense.nonzero()
             data  = dense[dense >= 1e-9]
             assert len(index) == len(data)
-            self.Graph = torch.sparse.IntTensor(index.t(), data, torch.Size([self.n_users+self.m_items, self.n_users+self.m_items]))
+            self.Graph = torch.sparse.FloatTensor(index.t(), data, torch.Size([self.n_users+self.m_items, self.n_users+self.m_items]))
         return self.Graph
 
     def __build_test(self):

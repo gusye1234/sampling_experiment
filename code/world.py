@@ -63,6 +63,7 @@ config['var_lr'] = args.varlr
 config['rec_weight_decay'] = args.recdecay
 config['var_weight_decay'] = args.vardecay
 config['x_weight_decay'] = args.xdecay
+config['w_weight_decay'] = args.wdecay
 config['lightGCN_n_layers']= args.layer
 # ===============================
 config['batch_size'] = 32768

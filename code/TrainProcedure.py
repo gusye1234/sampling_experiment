@@ -17,7 +17,7 @@ CORES = world.CORES
 
           
 def all_data(dataset, recommend_model, var_model, loss_class, epoch, w=None):
-    flag = f"all_data_[{world.rec_type}-{world.var_type}]"
+    flag = f"all_data_[{world.rec_type}-{world.var_type}] type 1"
     print(flag)
     Recmodel = recommend_model
     Varmodel = var_model
@@ -25,34 +25,41 @@ def all_data(dataset, recommend_model, var_model, loss_class, epoch, w=None):
     lgn = world.var_type.startswith('lgn')
     
     (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
-    epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
+    
     datalen = len(epoch_users)
     
-    for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
-        batch_users = batch_users.to(world.device)
-        batch_items = batch_items.to(world.device)
-        batch_xij = batch_xij.to(world.device)
-        if batch_i == 0:
-            print(len(batch_users))
-        Recmodel.train()
-        Varmodel.eval()
-        rating = Recmodel(batch_users, batch_items)
-        batch_gamma = Varmodel(batch_users, batch_items)
-        loss1 = loss_class.stageOne(rating, batch_xij, batch_gamma)
+    epoch_users = epoch_users.to(world.device)
+    epoch_items = epoch_items.to(world.device)
+    epoch_xij = epoch_xij.to(world.device)
 
-        Recmodel.eval()
-        Varmodel.train()
-        rating = Recmodel(batch_users, batch_items)
-        if lgn:
-            batch_gamma, reg_loss = Varmodel.forwardWithReg(batch_users, batch_items)
-            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, reg_loss=reg_loss)
-        else:
-            batch_gamma = Varmodel(batch_users, batch_items)
-            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
+    Recmodel.train()
+    Varmodel.eval()
+    rating = Recmodel(epoch_users, epoch_items)
+    epoch_gamma = Varmodel(epoch_users, epoch_items)
+    loss1 = loss_class.stageOne(rating, epoch_xij, epoch_gamma)
 
-        if world.tensorboard:
-            w.add_scalar(flag+"/stageone", loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)
-            w.add_scalar(flag+"/stagetwo", loss2, epoch*round(datalen/world.config['batch_size']) + batch_i)
+    Recmodel.eval()
+    Varmodel.train()
+    rating = Recmodel(epoch_users, epoch_items)
+    if lgn:
+        epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items)
+        loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+    else:
+        epoch_gamma = Varmodel(epoch_users, epoch_items)
+        loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij)
+
+    if epoch % 50 == 0:
+        np.savetxt(f'/output/lgn_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))
+        user_emb, item_emb = Varmodel.get_user_item_embedding()
+        np.savetxt(f'/output/lgn_user_emb{epoch}.txt', np.array(user_emb.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_item_emb_{epoch}.txt', np.array(item_emb.cpu().detach().numpy()))
+        
+
+    if world.tensorboard:
+        w.add_scalar(flag+"/stageone", loss1, epoch)
+        w.add_scalar(flag+"/stagetwo", loss2, epoch)
 
     print('end')
 
@@ -129,10 +136,10 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
         # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
         loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
     else:
-        epoch_gamma = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
+        epoch_gamma = Varmodel(epoch_users, epoch_items, epoch_xij)
         loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij)
     
-    if epoch % 50 == 0:
+    if epoch == 1000:
         np.savetxt(f'/output/lgn_xij_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))

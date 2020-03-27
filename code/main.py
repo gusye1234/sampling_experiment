@@ -71,7 +71,7 @@ try:
         #torch.save(Recmodel.state_dict(), os.path.join(world.PATH, f'Rec_{flag}.pth.tar'))
         #torch.save(Varmodel.state_dict(), os.path.join(world.PATH, f'Var_{flag}.pth.tar'))
         # test
-        if i%25 == 0 :
+        if i%100 == 0 :
             print('[TEST]')
             testDict = dataset.getTestDict()
             TrainProcedure.Test(dataset, Recmodel, Varmodel, world.top_k, i, w)
