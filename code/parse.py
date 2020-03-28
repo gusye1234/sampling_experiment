@@ -23,6 +23,8 @@ def parse_args():
                         help="weight decay for rec model")
     parser.add_argument('--layer', type=int,default=2,
                         help="the layer num of lightGCN")
+    parser.add_argument('--hyperx', type=float, default=0.2,
+                        help='hyper parameter in x dimension')
     parser.add_argument('--dropout', type=bool,default=False,
                         help="using the dropout or not")
     parser.add_argument('--keepprob', type=float,default=0.6,

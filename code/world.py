@@ -25,7 +25,9 @@ Varmodels = {
   8:'lgn_xij',
   9:'lgn_xij2',
   10:'lgn_itemper_single',
-  11:'lgn_itemper_matrix'
+  11:'lgn_itemper_matrix',
+  12:'lgn_itemper_outer_product_scalar',
+  13:'lgn_itemper_outer_product_matrix'
 }
 
 losses = {
@@ -65,6 +67,7 @@ config['var_weight_decay'] = args.vardecay
 config['x_weight_decay'] = args.xdecay
 config['w_weight_decay'] = args.wdecay
 config['lightGCN_n_layers']= args.layer
+config['hyper_x'] = args.hyperx
 # ===============================
 config['batch_size'] = 32768
 config['all_batch_size'] = 32768
