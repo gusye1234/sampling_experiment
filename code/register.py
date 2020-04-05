@@ -13,7 +13,7 @@ Rec_register = {
 }
 
 NOTE = """
-    Any Var model should implement `allGamma` methods.
+    Any Var model should implement `allGamma` methods for the test.
 """
 
 Var_register = {
