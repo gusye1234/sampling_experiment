@@ -35,26 +35,29 @@ def all_data(dataset, recommend_model, var_model, loss_class, epoch, w=None):
     Recmodel.train()
     Varmodel.eval()
     rating = Recmodel(epoch_users, epoch_items)
-    epoch_gamma = Varmodel(epoch_users, epoch_items)
+    epoch_gamma = Varmodel(epoch_users, epoch_items).data
     loss1 = loss_class.stageOne(rating, epoch_xij, epoch_gamma)
 
     Recmodel.eval()
     Varmodel.train()
-    rating = Recmodel(epoch_users, epoch_items)
+    rating = Recmodel(epoch_users, epoch_items).data
     if lgn:
+        print('lgn pos!')
         epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items)
-        loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+        loss2 = loss_class.stageTwo_Prior(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
     else:
+        print('mf pos!')
         epoch_gamma = Varmodel(epoch_users, epoch_items)
-        loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij)
+        loss2 = loss_class.stageTwo_Prior(rating, epoch_gamma, epoch_xij)
 
-    if epoch % 50 == 0:
-        np.savetxt(f'/output/lgn_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
-        np.savetxt(f'/output/lgn_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
-        np.savetxt(f'/output/lgn_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))
-        user_emb, item_emb = Varmodel.get_user_item_embedding()
-        np.savetxt(f'/output/lgn_user_emb{epoch}.txt', np.array(user_emb.cpu().detach().numpy()))
-        np.savetxt(f'/output/lgn_item_emb_{epoch}.txt', np.array(item_emb.cpu().detach().numpy()))
+    if epoch % 200 == 0:
+        np.savetxt(f'/output/mf_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
+        np.savetxt(f'/output/mf_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
+        np.savetxt(f'/output/mf_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))
+        user_emb, item_emb1, item_emb0 = Varmodel.get_user_item_embedding()
+        np.savetxt(f'/output/mf_user_emb{epoch}.txt', np.array(user_emb.cpu().detach().numpy()))
+        np.savetxt(f'/output/mf_item_emb1_{epoch}.txt', np.array(item_emb1.cpu().detach().numpy()))
+        np.savetxt(f'/output/mf_item_emb0_{epoch}.txt', np.array(item_emb0.cpu().detach().numpy()))
         
 
     if world.tensorboard:
@@ -121,27 +124,24 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
     epoch_items = epoch_items.to(world.device)
     epoch_xij = epoch_xij.to(world.device)
 
-    Recmodel.train()
-    Varmodel.eval()
+  
     rating = Recmodel(epoch_users, epoch_items)
-    epoch_gamma = Varmodel(epoch_users, epoch_items, epoch_xij)
-    loss1 = loss_class.stageOne(rating, epoch_xij, epoch_gamma)
+    epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
+    gam1=epoch_gamma.data
+    loss1 = loss_class.stageOne(rating, epoch_xij, gam1)
 
-    Recmodel.eval()
-    Varmodel.train()
-    rating = Recmodel(epoch_users, epoch_items)
+    rating = Recmodel(epoch_users, epoch_items).data
     if lgn:
         print('lgn reg')
-        epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
         # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
-        loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+        loss2 = loss_class.stageTwo_Prior(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
     else:
-        epoch_gamma = Varmodel(epoch_users, epoch_items, epoch_xij)
-        loss2 = loss_class.stageTwo(rating, epoch_gamma, epoch_xij)
+        print('mf reg')
+        loss2 = loss_class.stageTwo_Prior(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
     
-    if epoch == 1000:
+    if epoch % 100 == 0 :
         np.savetxt(f'/output/lgn_xij_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
-        np.savetxt(f'/output/lgn_xij_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
+        #np.savetxt(f'/output/lgn_xij_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))
         user_emb, item_emb0, item_emb1 = Varmodel.get_user_item_embedding()
         np.savetxt(f'/output/lgn_xij_user_emb{epoch}.txt', np.array(user_emb.cpu().detach().numpy()))
