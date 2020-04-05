@@ -34,12 +34,16 @@ class ELBO:
         self.bce = nn.BCELoss()
         rec_lr = config['rec_lr']
         var_lr = config['var_lr']
+        self.gamma_KL = config['gamma_KL']
         self.optFortheta = optim.Adam(rec_model.parameters(), lr=rec_lr, weight_decay=config['rec_weight_decay'])
-        self.no_var_decay = world.var_type.startswith('lgn')
-        if self.no_var_decay:
-            self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr)    
-        else:
-            self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr, weight_decay=config['var_weight_decay'])
+        self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr)
+        #self.no_var_decay = world.var_type.startswith('lgn')
+          
+        #if self.no_var_decay:
+            #self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr)    
+        #else:
+            #print('optimizer weight decay!')
+            #self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr, weight_decay=config['var_weight_decay'])
 
     def basic_GMF_loss(self, rating, xij):
         rating: torch.Tensor
@@ -55,6 +59,79 @@ class ELBO:
         loss.backward()
         self.optFortheta.step()
         return loss.data
+
+
+    def stageTwo_Prior(self, rating, gamma, xij, pij=None, reg_loss = None):
+        """
+        using the same data as stage one.
+        we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
+        unbiased_loss = BCE(xij, rating_ij)*len(batch)
+                        + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
+                        + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
+        """
+        rating: torch.Tensor
+        gamma: torch.Tensor
+        xij: torch.Tensor
+
+        try:
+            assert rating.size() == gamma.size() == xij.size()
+            assert len(rating.size()) == 1
+            if pij is not None:
+                assert rating.size() == pij.size()
+        except ValueError:
+            print("input error!")
+            print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
+
+        gamma = gamma + self.eps
+
+        
+        print('gamma', gamma[:10])
+        part_one =  self.cross(xij, rating)
+        part_two =  self.cross(xij, self.epsilon)
+        part_tre =  gamma*(log(self.eta)-log(gamma)) + (1-gamma)*(log(1-self.eta)-log(1-gamma))
+        print('part', part_one[:10], part_two[:10], part_tre[:10])
+        if pij is None:      
+            part_one = part_one * gamma
+            part_two = part_two * (1 - gamma)
+            print('part gamma', part_one[:10], part_two[:10],part_tre[:10])
+            print('stagetwoNoPrior pij None!!!')
+        else:
+            pij = (pij + self.eps).detach()
+            part_one = part_one * gamma / pij
+            part_two = part_two * (1 - gamma)/ pij
+            part_tre = part_tre/pij
+        out_loss = -(torch.sum(part_one) + torch.sum(part_two)+self.gamma_KL*torch.sum(part_tre)).data
+
+        loss1 = torch.sum(part_one)
+        loss2 = torch.sum(part_two)
+        loss3 = torch.sum(part_tre)
+        print('loss1 2 3', loss1, loss2, loss3)
+        print(self.gamma_KL)
+        loss: torch.Tensor = -(loss1 + loss2 + self.gamma_KL*loss3)
+        print('gamma_KL', self.gamma_KL)
+        print('loss', loss)
+        
+        if reg_loss is not None:
+            print(loss, reg_loss)
+            loss = loss + reg_loss
+            print('reg+loss', loss)
+            
+        
+        if torch.isnan(loss) or torch.isinf(loss):
+            print('part_one:', part_one)
+            print('part_two:', part_two)
+            print("loss1:", loss1)
+            print("loss2:", loss2)
+            raise ValueError("nan or inf")
+        
+        cri = out_loss
+
+        self.optForvar.zero_grad()
+        loss.backward()
+        self.optForvar.step()
+
+        return cri
+
 
     def stageOne(self, rating, xij, gamma=None, pij=None):
         """
@@ -75,6 +152,7 @@ class ELBO:
             part_one = self.cross(xij, rating)
             part_one = part_one * gamma.detach()
             loss: torch.Tensor = -torch.sum(part_one)
+            print('stageone pij None')
 
         else:
             pij = (pij + self.eps).detach()
@@ -89,7 +167,7 @@ class ELBO:
         return cri
 
     def stageTwo(self, rating, gamma, xij, pij=None, reg_loss = None):
-        r"""
+        """
         using the same data as stage one.
         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
         unbiased_loss = BCE(xij, rating_ij)*len(batch)
@@ -119,9 +197,11 @@ class ELBO:
         out_one = (part_one * gamma).detach()
         part_two = (self.cross(xij, self.epsilon) + same_term)
         out_two = part_two.detach()
-        if pij is None:
+        if pij is None:      
             part_one = part_one * gamma
+            print('gamma', gamma[:1000])       
             part_two = part_two
+            print('stagetwo pij None')
         else:
             pij = (pij + self.eps).detach()
             part_one = part_one * gamma / pij
@@ -134,7 +214,10 @@ class ELBO:
         loss: torch.Tensor = -(loss1 + loss2)
         
         if reg_loss is not None:
+            print(loss, reg_loss)
             loss = loss + reg_loss
+            print('reg+loss', loss)
+            
         
         if torch.isnan(loss) or torch.isinf(loss):
             print('part_one:', part_one)

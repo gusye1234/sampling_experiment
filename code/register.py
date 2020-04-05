@@ -18,18 +18,11 @@ NOTE = """
 
 Var_register = {
     'mf': model.VarMF_reg,
-    'mf_xij': model.VarMF_xij,
-    'mf_xij2': model.VarMF_xij2,
     'mf_itemper': model.VarMF_xij_item_personal,
-    'mf_symper': model.VarMF_xij_Symmetric_personal,
-    'mf_itemper_matrix' : None,
     'lgn': model.LightGCN,
-    'lgn_xij': model.LightGCN_xij,
-    'lgn_xij2': model.LightGCN_xij2,
     'lgn_itemper_single': model.LightGCN_xij_item_personal_single,
     'lgn_itemper_matrix': model.LightGCN_xij_item_personal_matrix,
-    'lgn_itemper_outer_product_scalar': model.LightGCN_xij_item_personal_outer_product_single,
-    'lgn_itemper_outer_product_matrix':model.LightGCN_xij_item_personal_outer_product_matrix
+    'lgn_itemper_matrix_nohyper':model.LightGCN_xij_item_personal_matrix_nohyper
 }
 
 

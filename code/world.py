@@ -16,18 +16,11 @@ Recmodels = {
 
 Varmodels = {
   1:'mf',
-  2:'mf_xij',
-  3:'mf_xij2',
-  4:'mf_itemper',
-  5:'mf_symper',
-  6:'mf_itemper_matrix',
-  7:'lgn',
-  8:'lgn_xij',
-  9:'lgn_xij2',
-  10:'lgn_itemper_single',
-  11:'lgn_itemper_matrix',
-  12:'lgn_itemper_outer_product_scalar',
-  13:'lgn_itemper_outer_product_matrix'
+  2:'mf_itemper',
+  3:'lgn',
+  4:'lgn_itemper_single',
+  5:'lgn_itemper_matrix',
+  6:'lgn_itemper_matrix_nohyper'
 }
 
 losses = {
@@ -66,6 +59,7 @@ config['rec_weight_decay'] = args.recdecay
 config['var_weight_decay'] = args.vardecay
 config['x_weight_decay'] = args.xdecay
 config['w_weight_decay'] = args.wdecay
+config['gamma_KL'] = args.gamma_KL
 config['lightGCN_n_layers']= args.layer
 config['hyper_x'] = args.hyperx
 # ===============================
@@ -75,7 +69,7 @@ config['test_u_batch_size'] = 100
 config['xij_dim'] = 1
 config['num_xij'] = 1
 # ======================
-TRAIN_epochs = 1201
+TRAIN_epochs = 1401
 LOAD = False
 PATH = '../checkpoints'
 top_k = 5

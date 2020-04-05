@@ -11,7 +11,7 @@ def parse_args():
                         help="the embedding size of varmodel")
     parser.add_argument('--reclr', type=float,default=0.1,
                         help="learning rate for rec model")
-    parser.add_argument('--varlr', type=float,default=0.5,
+    parser.add_argument('--varlr', type=float,default=0.1,
                         help="learning rate for var model")
     parser.add_argument('--wdecay', type=float,default=0,
                         help="weight decay for var model w")
@@ -19,6 +19,8 @@ def parse_args():
                         help="weight decay for var model x")
     parser.add_argument('--vardecay', type=float,default=0.001,
                         help="weight decay for var model embedding")
+    parser.add_argument('--gamma_KL', type=float,default=0,
+                        help="prior KL")
     parser.add_argument('--recdecay', type=float,default=1,
                         help="weight decay for rec model")
     parser.add_argument('--layer', type=int,default=2,
