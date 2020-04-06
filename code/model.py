@@ -614,8 +614,9 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
 
         self.w_user = torch.nn.Linear(self.latent_dim, self.latent_dim, bias=False)
         self.w_item = torch.nn.Linear(self.latent_dim, self.latent_dim, bias=False)
-        nn.init.constant_(self.w_user.weight, 1)
-        nn.init.constant_(self.w_item.weight, 1)
+        eye = torch.eye(self.latent_dim, self.latent_dim)
+        self.w_user.weight.data.copy_(eye)
+        self.w_item.weight.data.copy_(eye)
         print(self.w_user.weight)
         print(self.w_item.weight)
 
@@ -824,8 +825,9 @@ class LightGCN_xij_item_personal_matrix_nohyper(nn.Module):
 
         self.w_user = torch.nn.Linear(self.latent_dim, self.latent_dim, bias=False)
         self.w_item = torch.nn.Linear(self.latent_dim, self.latent_dim, bias=False)
-        nn.init.constant_(self.w_user.weight, 1)
-        nn.init.constant_(self.w_item.weight, 1)
+        eye = torch.eye(self.latent_dim, self.latent_dim)
+        self.w_user.weight.data.copy_(eye)
+        self.w_item.weight.data.copy_(eye)
         
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
