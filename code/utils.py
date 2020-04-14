@@ -88,7 +88,7 @@ class ELBO:
         print('gamma', gamma[:10])
         part_one =  self.cross(xij, rating)
         part_two =  self.cross(xij, self.epsilon)
-        part_tre =  gamma*(log(self.eta)-log(gamma)) + (1-gamma)*(log(1-self.eta)-log(1-gamma))
+        part_tre =  gamma*(log(self.eta)-log(gamma)) + (1-gamma)*(log(1-self.eta)-log(1-gamma + 2*ELBO.eps))
         print('part', part_one[:10], part_two[:10], part_tre[:10])
         if pij is None:      
             part_one = part_one * gamma
@@ -359,127 +359,6 @@ class Sample_positive_all:
             self.__prob['p(j|k)'] = p_jk
             print('pkj', self.__prob['p(j|k)'])
 
-
-class Sample_MF:
-    """
-    implement the sample procedure \n
-    we have: \n
-        items: (m, d)
-        user: (n, d)
-        gamma: (n,m)
-        D_k: sum(items, axis=0) => (d)
-        S_i: sum(gamma, axis=1) => (n)
-    NOTE:
-        consider the huge dataset we may have, when calculate the probability,
-        we turn off the gradient recording function, only return users and items list. 
-        
-    """
-
-    def __init__(self, k, var_model: VarMF_reg):
-        self.k = k
-        self.model = var_model
-        self.__compute = False
-        self.__prob = {}
-        # self.save = True
-
-    def setK(self, k):
-        self.k = k
-
-    def sampleForEpoch(self, epoch_k, notcompute=True):
-        """
-        sample pairs for a whole epoch, `epoch_k` samples.
-        the strategy changes
-        """
-        print(self.__prob, self.__compute)
-        if self.__compute:
-            pass
-        elif notcompute and len(self.__prob) != 0:
-            pass
-        else:
-            self.compute()
-            print('have been computed')
-        self.__compute = False
-        expected_Users = self.__prob['p(i)'] * epoch_k
-        Userbase = expected_Users.int()
-        # int() will floor the numbers, like 1.4 -> 1
-        AddOneProbs = expected_Users - Userbase
-        # print(AddOneProbs)
-        AddOnes = torch.bernoulli(AddOneProbs)
-        expected_Users = Userbase + AddOnes
-        expected_Users = expected_Users.int()
-        Samusers = None
-        Samitems = None
-        for user_id, sample_times in enumerate(expected_Users):
-            items = self.sampleForUser(user_id, times=sample_times)
-            users = torch.Tensor([user_id] * sample_times).long()
-            if Samusers is None:
-                Samusers = users
-                Samitems = items
-            else:
-                Samusers = torch.cat([Samusers, users])
-                Samitems = torch.cat([Samitems, items])
-        self.__compute = False
-        self.__prob.clear()
-        return Samusers, Samitems
-
-    def sampleForUser(self, user, times=1):
-        candi_dim = self.__prob['p(k|i)'][user].squeeze()
-        dims = torch.multinomial(candi_dim, times, replacement=True)
-        candi_items = self.__prob['p(j|k)'][dims]
-        items = torch.multinomial(candi_items, 1).squeeze(dim=1)
-        return items.long()
-
-    def compute(self):
-        """
-        compute everything we need in the sampling.        
-        """
-        with torch.no_grad():
-            u_emb: torch.Tensor = self.model.getAllUsersEmbedding()  # shape (n,d)
-            i_emb: torch.Tensor = self.model.getAllItemsEmbedding()  # shape (m,d)
-            # if self.save == True:
-            # np.savetxt('get.txt', np.array(u_emb.detach()))
-            # self.save = False
-            # gamma = torch.matmul(u_emb, i_emb.t()) # shape (n,m)
-            D_k = torch.sum(i_emb, dim=0)  # shape (d)
-            S_i = torch.sum(u_emb * D_k, dim=1)  # shape (n)
-            # S_i = torch.sum(gamma, dim=1) # shape (n)
-            p_i = S_i / torch.sum(S_i)  # shape (n)
-            p_jk = (i_emb / D_k).t()  # shape (d,m)
-            p_ki = ((u_emb * D_k) / S_i.unsqueeze(dim=1))  # shape (n, d)
-            self.__compute = True
-            self.__prob['u_emb'] = u_emb
-            self.__prob['i_emb'] = i_emb
-            # self.__prob['gamma']  = gamma
-            self.__prob['D_k'] = D_k
-            self.__prob['S_i'] = S_i
-            self.__prob['p(i)'] = p_i
-            print('pi', self.__prob['p(i)'])
-            self.__prob['p(k|i)'] = p_ki
-            print('pik', self.__prob['p(k|i)'])
-            self.__prob['p(j|k)'] = p_jk
-            print('pkj', self.__prob['p(j|k)'])
-
-    def sample(self, notcompute=False):
-        """
-        sample self.k samples
-        """
-        if self.__compute:
-            pass
-        elif notcompute and len(self.__prob) != 0:
-            pass
-        else:
-            self.compute()
-        self.__compute = False
-        users = torch.multinomial(self.__prob['p(i)'], self.k, replacement=True)
-        candi_dim = self.__prob['p(k|i)'][users]
-        dims = torch.multinomial(candi_dim, 1)
-        dims = dims.squeeze(dim=1)
-        candi_items = self.__prob['p(j|k)'][dims]
-        items = torch.multinomial(candi_items, 1).squeeze(dim=1)
-        # print(users.size(), items.size())
-        return users, items
-
-
 class sample_for_basic_GMF_loss:
     def __init__(self, k):
         self.k = k
@@ -619,6 +498,12 @@ def getAllData(dataset, gamma=None):
 # ===================end samplers==========================
 # =========================================================
 
+def set_seed(seed):
+    np.random.seed(seed)   
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    torch.manual_seed(seed)
 
 def minibatch(*tensors, **kwargs):
     batch_size = kwargs.get('batch_size', world.config['batch_size'])

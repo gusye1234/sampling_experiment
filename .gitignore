@@ -11,3 +11,4 @@
 *.sqlite3
 samwalker/
 **/output
+runs/

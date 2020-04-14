@@ -17,6 +17,8 @@ class BasicDataset(Dataset):
     def __init__(self):
         self.n_users = None
         self.m_items = None
+        self.allPos = None
+        self.allNeg = None
         self.__testDict = None
         
     def getUserItemFeedback(self, users, items):
@@ -43,7 +45,7 @@ class LastFM(BasicDataset):
     Incldue graph information
     LastFM dataset
     """
-    def __init__(self, path="/data/HungPaan/lastfm"):
+    def __init__(self, path="../data/samwalk_data"):
         # train or test
         self.mode_dict = {'train':0, "test":1}
         self.mode    = self.mode_dict['train']

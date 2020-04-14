@@ -46,4 +46,6 @@ def parse_args():
                         help="var model types")
     parser.add_argument('--sampletype', type=int,
                         help="sampling methods types")
+    parser.add_argument('--seed', type=int, default=2020,
+                        help="random seed")
     return parser.parse_args()

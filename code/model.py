@@ -585,13 +585,6 @@ class LightGCN_xij_item_personal_single(nn.Module):
         
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
-
-
-        
-       
-        
-       
-        
         return gamma
         
 
@@ -630,8 +623,6 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         eye = torch.eye(self.latent_dim, self.latent_dim)
         self.w_user.weight.data.copy_(eye)
         self.w_item.weight.data.copy_(eye)
-        print(self.w_user.weight)
-        print(self.w_item.weight)
 
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
@@ -681,11 +672,8 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
             xij_item_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
             xij_item_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
             xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
-            print('linear trans', self.w_user.weight, self.w_item.weight)
-            print('lgn embedding1', users_emb[0:3], items_emb[0:3])
             users_emb = self.w_user(users_emb)
             items_emb = self.w_item(items_emb)
-            print('lgn embedding2', users_emb[0:3], items_emb[0:3])
             #users_emb = self.soft(torch.cat([users_emb, xij_user_emb], dim=1))
             users_emb = torch.cat([(1-hyper_x)*self.soft(users_emb), xij_user_emb], dim=1)
             items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
@@ -795,15 +783,11 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         xij_item_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
         xij_item_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
-        print('linear trans', self.w_user.weight, self.w_item.weight)
-        print('lgn embedding1', users_emb[0:3], items_emb[0:3])
         users_emb = self.w_user(users_emb)
         items_emb = self.w_item(items_emb)
-        print('lgn embedding2', users_emb[0:3], items_emb[0:3])
         #users_emb = self.soft(torch.cat([users_emb, xij_user_emb], dim=1))
         users_emb = torch.cat([(1-hyper_x)*self.soft(users_emb), xij_user_emb], dim=1)
         items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
-        print('lgn embedding3', users_emb[0:3], items_emb[0:3])
 
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)

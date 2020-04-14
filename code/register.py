@@ -5,7 +5,8 @@ sampling_register = {
     'all_data': TrainProcedure.all_data,
     'all_data_xij': TrainProcedure.all_data_xij,
     'all_data_nobatch': None,
-    'all_data_nobatch_xij': TrainProcedure.all_data_xij_no_batch
+    'all_data_nobatch_xij': TrainProcedure.all_data_xij_no_batch,
+    'fast_sampling': TrainProcedure.sample_xij_no_batch
 }
 
 Rec_register = {

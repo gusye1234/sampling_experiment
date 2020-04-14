@@ -32,7 +32,7 @@ samplings = {
   2: 'all_data_xij',
   3: 'all_data_nobatch',
   4: 'all_data_nobatch_xij',
-  5: 'fast_samping', # not yet,
+  5: 'fast_sampling', # not yet,
 }
 
 
@@ -81,6 +81,7 @@ device = torch.device('cuda' if GPU else "cpu")
 CORES = multiprocessing.cpu_count() // 2
 multi_cores = False
 ontest = args.ontest
+seed = args.seed
 
 
 # let pandas shut up

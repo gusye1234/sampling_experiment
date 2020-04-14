@@ -16,7 +16,7 @@ CORES = world.CORES
 
 
           
-def all_data(dataset, recommend_model, var_model, loss_class, epoch, w=None):
+def all_data(dataset, recommend_model, var_model, loss_class, epoch, w=None, **args):
     flag = f"all_data_[{world.rec_type}-{world.var_type}] type 1"
     print(flag)
     Recmodel = recommend_model
@@ -68,7 +68,7 @@ def all_data(dataset, recommend_model, var_model, loss_class, epoch, w=None):
 
     return f"[ALL[{datalen}]]"
        
-def all_data_xij(dataset, recommend_model, var_model, loss_class, epoch, w=None):
+def all_data_xij(dataset, recommend_model, var_model, loss_class, epoch, w=None, **args):
     flag = f"all_data_xij_[{world.rec_type}-{world.var_type}]"
     print(flag)
     Recmodel = recommend_model
@@ -109,7 +109,7 @@ def all_data_xij(dataset, recommend_model, var_model, loss_class, epoch, w=None)
     print('end')
     return f"[ALL[{datalen}]]"
 
-def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, w=None):
+def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, w=None, **args):
     flag = f"all_data_xij_nobatch_[{world.rec_type}-{world.var_type}]"
     print(flag)
     Recmodel = recommend_model
@@ -154,7 +154,64 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
         w.add_scalar(flag + '/stageTwo', loss2, epoch)
     print('end')
     return f"[ALL[{datalen}]]"
-          
+
+def sample_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, w=None, **args):
+    flag = f"sample_xij_nobatch_[{world.rec_type}-{world.var_type}]"
+    print(flag)
+    sampler = args['sampler']
+    Recmodel = recommend_model
+    Varmodel = var_model
+    loss_class: utils.ELBO
+    lgn = world.var_type.startswith('lgn')
+    
+    
+    start = time()
+    epoch_k = dataset.trainDataSize*5
+    print("epoch_k", epoch_k)
+    (epoch_users, epoch_items, epoch_xij) = sampler.sample(epoch_k)
+    datalen = len(epoch_users)
+    print(epoch_users.shape)
+    print(epoch_items.shape)
+    print(epoch_xij.shape)
+    print(f"[sample time]", time() - start)
+
+    epoch_users = epoch_users.to(world.device)
+    epoch_items = epoch_items.to(world.device)
+    epoch_xij = epoch_xij.to(world.device)
+
+  
+    rating = Recmodel(epoch_users, epoch_items)
+    epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
+    gam1=epoch_gamma.data
+    loss1 = loss_class.stageOne(rating, epoch_xij, gam1)
+
+    rating = Recmodel(epoch_users, epoch_items).data
+    if lgn:
+        print('lgn reg')
+        # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
+        loss2 = loss_class.stageTwo_Prior(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+    else:
+        print('mf reg')
+        loss2 = loss_class.stageTwo_Prior(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+    
+    if epoch % 100 == 0 :
+        np.savetxt(f'/output/lgn_xij_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
+        #np.savetxt(f'/output/lgn_xij_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_xij_x{epoch}.txt', np.array(epoch_xij.cpu().detach().numpy()))
+        user_emb, item_emb0, item_emb1 = Varmodel.get_user_item_embedding()
+        np.savetxt(f'/output/lgn_xij_user_emb{epoch}.txt', np.array(user_emb.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_xij_item_emb0_{epoch}.txt', np.array(item_emb0.cpu().detach().numpy()))
+        np.savetxt(f'/output/lgn_xij_item_emb1_{epoch}.txt', np.array(item_emb1.cpu().detach().numpy()))
+
+    
+    if world.tensorboard:
+        w.add_scalar(flag + '/stageOne', loss1, epoch)
+        w.add_scalar(flag + '/stageTwo', loss2, epoch)
+    print('end')
+    return f"[ALL[{datalen}]]"
+
+
+        
 def Alldata_train_set_gamma_cross_entrophy(dataset, recommend_model, loss_class, epoch, w=None):
     print('begin Alldata_train_set_gamma_cross_entrophy!')
     Recmodel : model.RecMF = recommend_model
@@ -188,6 +245,8 @@ def Alldata_train_set_gamma_cross_entrophy(dataset, recommend_model, loss_class,
 
     print('end Alldata_train_set_gamma_cross_entrophy!')
     return f"[ALL[{datalen}]]"
+
+
 
 def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, epoch_k, epoch,w):
     # global users_set, items_set

@@ -11,14 +11,21 @@ from pprint import pprint
 import os
 import time
 import register
+from sample import SamplePersonal
+
+
+utils.set_seed(world.seed)
+
+#########################################
 # loading data...
 dataset   = dataloader.LastFM()
 lm_loader = DataLoader(dataset, batch_size=world.config['batch_size'], shuffle=True, drop_last=True) 
 
 world.config['num_users'] = dataset.n_users
 world.config['num_items'] = dataset.m_items
-
-
+#########################################
+#########################################
+# print out
 print('===========config================')
 pprint(world.config)
 print("cores for test:", world.CORES)
@@ -29,23 +36,28 @@ print("Weight path:", world.PATH)
 print(world.rec_type, world.var_type, world.loss_type, world.sample_type)
 print('===========end===================')
 world.config['dataset'] = dataset
-
-
+#########################################
+#########################################
 # initialize models
-
 Recmodel = register.Rec_register[world.rec_type](world.config)
 Varmodel = register.Var_register[world.var_type](world.config)
 train_method = register.sampling_register[world.sample_type]
+if world.sample_type == 'fast_sampling':
+    sampler = SamplePersonal(Varmodel, dataset)
+else:
+    sampler = None
 elbo = utils.ELBO(world.config,
                   rec_model=Recmodel,
                   var_model=Varmodel)
-
+#########################################
+#########################################
+# load
 flag = f"{world.sample_type}_{world.rec_type}_{world.var_type}"
 if world.LOAD:
         Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, f'Rec_{flag}.pth.tar')))
         Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, f'Var_{flag}.pth.tar')))
-sampler_gamma_save = utils.sample_for_basic_GMF_loss(k=3)
-
+########################################$
+#########################################
 # train
 Neg_k = 1
 world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
@@ -54,7 +66,7 @@ if globals().get('Varmodel'):
     Varmodel = Varmodel.to(world.device)
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("/output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter("./runs/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
     
@@ -64,7 +76,7 @@ try:
         start = time.time()
         print(f'===============[EPOCH {i}]=================')
         # training
-        output_information = train_method(dataset, Recmodel, Varmodel, elbo, i, w)
+        output_information = train_method(dataset, Recmodel, Varmodel, elbo, i, w=w, sampler=sampler)
         print(output_information)
         
         # save
@@ -79,3 +91,4 @@ try:
 finally:
     if world.tensorboard:
         w.close()
+#########################################
