@@ -13,11 +13,11 @@ def parse_args():
                         help="learning rate for rec model")
     parser.add_argument('--varlr', type=float,default=0.1,
                         help="learning rate for var model")
-    parser.add_argument('--wdecay', type=float,default=0,
+    parser.add_argument('--wdecay', type=float,default=0.1,
                         help="weight decay for var model w")
     parser.add_argument('--xdecay', type=float,default=10,
                         help="weight decay for var model x")
-    parser.add_argument('--vardecay', type=float,default=0.001,
+    parser.add_argument('--vardecay', type=float,default=0.1,
                         help="weight decay for var model embedding")
     parser.add_argument('--gamma_KL', type=float,default=0,
                         help="prior KL")
@@ -25,7 +25,7 @@ def parse_args():
                         help="weight decay for rec model")
     parser.add_argument('--layer', type=int,default=2,
                         help="the layer num of lightGCN")
-    parser.add_argument('--hyperx', type=float, default=0.2,
+    parser.add_argument('--hyperx', type=float, default=0.5,
                         help='hyper parameter in x dimension')
     parser.add_argument('--dropout', type=bool,default=False,
                         help="using the dropout or not")
@@ -42,9 +42,9 @@ def parse_args():
     parser.add_argument('--comment', type=str,default="lgn")
     parser.add_argument('--load', type=bool,default=False)
     parser.add_argument('--epochs', type=int,default=100)
-    parser.add_argument('--vartype', type=int,
+    parser.add_argument('--vartype', type=int, default=5,
                         help="var model types")
-    parser.add_argument('--sampletype', type=int,
+    parser.add_argument('--sampletype', type=int, default=5,
                         help="sampling methods types")
     parser.add_argument('--seed', type=int, default=2020,
                         help="random seed")

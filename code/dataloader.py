@@ -45,7 +45,7 @@ class LastFM(BasicDataset):
     Incldue graph information
     LastFM dataset
     """
-    def __init__(self, path="../data/samwalk_data"):
+    def __init__(self, path="/data/HungPaan/lastfm/"):
         # train or test
         self.mode_dict = {'train':0, "test":1}
         self.mode    = self.mode_dict['train']

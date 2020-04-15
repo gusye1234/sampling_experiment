@@ -69,7 +69,7 @@ config['test_u_batch_size'] = 100
 config['xij_dim'] = 1
 config['num_xij'] = 1
 # ======================
-TRAIN_epochs = 1401
+TRAIN_epochs = 1001
 LOAD = False
 PATH = '../checkpoints'
 top_k = 5

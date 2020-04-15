@@ -168,7 +168,7 @@ def sample_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, 
     start = time()
     epoch_k = dataset.trainDataSize*5
     print("epoch_k", epoch_k)
-    (epoch_users, epoch_items, epoch_xij) = sampler.sample(epoch_k)
+    (epoch_users, epoch_items, epoch_xij, G) = sampler.sample(epoch_k)
     datalen = len(epoch_users)
     print(epoch_users.shape)
     print(epoch_items.shape)
@@ -181,19 +181,19 @@ def sample_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, 
 
   
     rating = Recmodel(epoch_users, epoch_items)
-    epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij)
+    epoch_gamma, reg_loss = Varmodel.forwardWithReg(epoch_users, epoch_items, epoch_xij, G, datalen)
     gam1=epoch_gamma.data
-    loss1 = loss_class.stageOne(rating, epoch_xij, gam1)
+    loss1 = loss_class.stageOne(rating, epoch_xij, gam1, gam1)
 
     rating = Recmodel(epoch_users, epoch_items).data
     if lgn:
         print('lgn reg')
         # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
-        loss2 = loss_class.stageTwo_Prior(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
+        loss2 = loss_class.stageTwoPrior(rating, epoch_gamma, epoch_xij, epoch_gamma, reg_loss=reg_loss)
     else:
         print('mf reg')
-        loss2 = loss_class.stageTwo_Prior(rating, epoch_gamma, epoch_xij, reg_loss=reg_loss)
-    
+        loss2 = loss_class.stageTwoPrior(rating, epoch_gamma, epoch_xij, epoch_gamma, reg_loss=reg_loss)
+
     if epoch % 100 == 0 :
         np.savetxt(f'/output/lgn_xij_gamma{epoch}.txt', np.array(epoch_gamma.cpu().detach().numpy()))
         #np.savetxt(f'/output/lgn_xij_rating{epoch}.txt', np.array(rating.cpu().detach().numpy()))
@@ -202,8 +202,8 @@ def sample_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, 
         np.savetxt(f'/output/lgn_xij_user_emb{epoch}.txt', np.array(user_emb.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_item_emb0_{epoch}.txt', np.array(item_emb0.cpu().detach().numpy()))
         np.savetxt(f'/output/lgn_xij_item_emb1_{epoch}.txt', np.array(item_emb1.cpu().detach().numpy()))
-
     
+
     if world.tensorboard:
         w.add_scalar(flag + '/stageOne', loss1, epoch)
         w.add_scalar(flag + '/stageTwo', loss2, epoch)
@@ -266,7 +266,8 @@ def sampler_train(dataset, sampler, recommend_model, var_model_reg, loss_class, 
                                             epoch_items.cpu().numpy()).astype('int')
     # print(f"[{epoch}]Positive Label Sparsity",np.sum(epoch_xij)/len(epoch_xij))
     # print(epoch_users[:5], epoch_items[:5], epoch_xij[:5])
-    for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
+    for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(
+            utils.minibatch(epoch_users, epoch_items, epoch_xij)):
         batch_users = batch_users.to(world.device)
         batch_items = batch_items.to(world.device)
         batch_xij = batch_xij.to(world.device)

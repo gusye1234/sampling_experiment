@@ -45,23 +45,78 @@ class ELBO:
             #print('optimizer weight decay!')
             #self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr, weight_decay=config['var_weight_decay'])
 
-    def basic_GMF_loss(self, rating, xij):
+    def stageTwoPrior(self, rating, gamma, xij, pij=None, reg_loss=None):
+        """
+        using the same data as stage one.
+        we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
+        unbiased_loss = BCE(xij, rating_ij)*len(batch)
+                        + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
+                        + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
+        """
         rating: torch.Tensor
+        gamma: torch.Tensor
         xij: torch.Tensor
+
         try:
-            assert rating.size() == xij.size()
+            assert rating.size() == gamma.size() == xij.size()
             assert len(rating.size()) == 1
+            if pij is not None:
+                assert rating.size() == pij.size()
         except ValueError:
             print("input error!")
             print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
-        loss: torch.Tensor = self.bce(rating, xij) * len(rating)
-        self.optFortheta.zero_grad()
+
+        gamma = gamma + self.eps
+
+        eta = xij * 1.0 + (1 - xij) * 0.1
+        print(eta[0:3], eta[37:40])
+        same_term = log((1 - eta + self.eps) / (1 - gamma + 2 * self.eps))
+        part_one = xij * log((rating + self.eps) / self.epsilon) \
+                   + (1 - xij) * log((1 - rating + self.eps) / (1 - self.epsilon)) \
+                   + log(eta / gamma) \
+                   - same_term
+        #out_one = (part_one * gamma).detach()
+        part_two = (self.cross(xij, self.epsilon) + same_term)
+        #out_two = part_two.detach()
+        if pij is None:
+            part_one = part_one * gamma
+            print('gamma', gamma[:100])
+            part_two = part_two
+            print('stagetwo pij prior 0.1 ')
+        else:
+            print('pro to gamma stagetwoPrior!')
+            pij = (pij + self.eps).detach()
+            print('pij',pij)
+            part_one = part_one * gamma / pij
+            part_two = part_two / pij
+
+        #out_loss = -(torch.sum(out_one) + torch.sum(out_two))
+
+        loss1 = torch.sum(part_one)
+        loss2 = torch.sum(part_two)
+        loss: torch.Tensor = -(loss1 + loss2)
+
+        if reg_loss is not None:
+            print(loss, reg_loss)
+            loss = loss + reg_loss
+            print('reg+loss', loss)
+
+        if torch.isnan(loss) or torch.isinf(loss):
+            print('part_one:', part_one)
+            print('part_two:', part_two)
+            print("loss1:", loss1)
+            print("loss2:", loss2)
+            raise ValueError("nan or inf")
+        cri = loss.data
+
+        self.optForvar.zero_grad()
         loss.backward()
-        self.optFortheta.step()
-        return loss.data
+        self.optForvar.step()
+
+        return cri
 
 
-    def stageTwo_Prior(self, rating, gamma, xij, pij=None, reg_loss = None):
+    def stageTwo_Prior_KL(self, rating, gamma, xij, pij=None, reg_loss = None):
         """
         using the same data as stage one.
         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
@@ -155,9 +210,8 @@ class ELBO:
             print('stageone pij None')
 
         else:
-            pij = (pij + self.eps).detach()
+            print('pro to gamma stageone!')
             part_one = self.cross(xij, rating)
-            part_one = part_one * gamma.detach() / pij
             loss: torch.Tensor = -torch.sum(part_one)
 
         cri = loss.data
@@ -244,230 +298,6 @@ class ELBO:
 # =================================================
 
 
-class Sample_positive_all:
-    def __init__(self, dataset, var_model, prob=0.3):
-        self.positive = prob
-        self.model = var_model
-        self.dataset = dataset
-        self.__compute = False
-        self.__prob = {}
-        self.G = 0
-
-    def sample_prob(self, gamma):
-        pij = gamma[self.epoch_k_1:] / self.G * (1 - self.positive)
-        pij = torch.cat([torch.tensor([1.0 / self.dataset.trainDataSize * self.positive] * self.epoch_k_1), pij])
-        return pij
-
-    def sampleForEpoch(self, epoch_k):
-        self.epoch_k_1 = torch.tensor(self.positive * epoch_k)
-        base = self.epoch_k_1.int()
-        # int() will floor the numbers, like 1.4 -> 1
-        AddOneProbs = self.epoch_k_1 - base
-        # print(AddOneProbs)
-        AddOnes = torch.bernoulli(AddOneProbs)
-        self.epoch_k_1 = (base + AddOnes).int()
-        self.epoch_k_2 = epoch_k - self.epoch_k_1
-        res_users1, res_items1 = self.samplePositive()
-        res_users2, res_items2 = self.sampleAll()
-        res_users = torch.cat([res_users1, res_users2])
-        res_items = torch.cat([res_items1, res_items2])
-        return res_users, res_items
-
-    def samplePositive(self):
-        l = len(self.dataset.trainUser)
-        candi_set = range(l)
-        # print('len', len(self.dataset.trainUser))
-        index = np.random.choice(candi_set, np.array(self.epoch_k_1), replace=True)
-        users = self.dataset.trainUser.reshape(-1)[index]
-        items = self.dataset.trainItem.reshape(-1)[index]
-        # p_pos = torch.tensor([1.0/l]*epoch_k_1)
-        return torch.tensor(users), torch.tensor(items)
-
-    def sampleAll(self, notcompute=True):
-        print(self.__prob, self.__compute)
-        if self.__compute:
-            pass
-        elif notcompute and len(self.__prob) != 0:
-            pass
-        else:
-            self.compute()
-            print('have been computed')
-        self.__compute = False
-        expected_Users = self.__prob['p(i)'] * self.epoch_k_2
-        Userbase = expected_Users.int()
-        # int() will floor the numbers, like 1.4 -> 1
-        AddOneProbs = expected_Users - Userbase
-        # print(AddOneProbs)
-        AddOnes = torch.bernoulli(AddOneProbs)
-        expected_Users = Userbase + AddOnes
-        expected_Users = expected_Users.int()
-        Samusers = None
-        Samitems = None
-        for user_id, sample_times in enumerate(expected_Users):
-            items = self.sampleForUser(user_id, times=sample_times)
-            users = torch.Tensor([user_id] * sample_times).long()
-            if Samusers is None:
-                Samusers = users
-                Samitems = items
-            else:
-                Samusers = torch.cat([Samusers, users])
-                Samitems = torch.cat([Samitems, items])
-        self.__compute = False
-        self.__prob.clear()
-        # p_all = torch.tensor([self.G]*epoch_k_2)
-        return Samusers, Samitems
-
-    def sampleForUser(self, user, times=1):
-        candi_dim = self.__prob['p(k|i)'][user].squeeze()
-
-        dims = torch.multinomial(candi_dim, times, replacement=True)
-        candi_items = self.__prob['p(j|k)'][dims]
-        items = torch.multinomial(candi_items, 1).squeeze(dim=1)
-        return items.long()
-
-    def compute(self):
-        """
-        compute everything we need in the sampling.
-        """
-        with torch.no_grad():
-            u_emb: torch.Tensor = self.model.getAllUsersEmbedding()  # shape (n,d)
-            i_emb: torch.Tensor = self.model.getAllItemsEmbedding()  # shape (m,d)
-            # if self.save == True:
-            # np.savetxt('get.txt', np.array(u_emb.detach()))
-            # self.save = False
-            # gamma = torch.matmul(u_emb, i_emb.t()) # shape (n,m)
-            D_k = torch.sum(i_emb, dim=0)  # shape (d)
-            S_i = torch.sum(u_emb * D_k, dim=1)  # shape (n)
-            # S_i = torch.sum(gamma, dim=1) # shape (n)
-            print(self.G)
-            self.G = torch.sum(S_i)
-            print(self.G)
-            p_i = S_i / self.G  # shape (n)
-            p_jk = (i_emb / D_k).t()  # shape (d,m)
-            p_ki = ((u_emb * D_k) / S_i.unsqueeze(dim=1))  # shape (n, d)
-
-            self.__compute = True
-            self.__prob['u_emb'] = u_emb
-            self.__prob['i_emb'] = i_emb
-            # self.__prob['gamma']  = gamma
-            self.__prob['D_k'] = D_k
-            self.__prob['S_i'] = S_i
-            self.__prob['p(i)'] = p_i
-            print('pi', self.__prob['p(i)'])
-            self.__prob['p(k|i)'] = p_ki
-            print('pik', self.__prob['p(k|i)'])
-            self.__prob['p(j|k)'] = p_jk
-            print('pkj', self.__prob['p(j|k)'])
-
-class sample_for_basic_GMF_loss:
-    def __init__(self, k):
-        self.k = k
-
-    def sampleForEpoch(self, dataset, k=3):
-        dataset: BasicDataset
-        allPosItems = dataset.allPos
-        posSamusers = None
-        posSamitems = None
-        for userID, posItems in enumerate(allPosItems):
-            items = torch.tensor(posItems)
-            users = torch.tensor([userID] * len(items)).long()
-            # print(users)
-            if posSamusers is None:
-                posSamusers = users
-                posSamitems = items
-            else:
-                posSamusers = torch.cat([posSamusers, users])
-                posSamitems = torch.cat([posSamitems, items])
-
-        negSamusers = None
-        negSamitems = None
-        itemNumUser = int(dataset.trainDataSize / dataset.n_users * k)
-        allNegItems = dataset.allNeg
-        for userID, negItems in enumerate(allNegItems):
-            items = torch.tensor(np.random.choice(negItems, size=itemNumUser, replace=True))
-            users = torch.tensor([userID] * itemNumUser).long()
-            if negSamusers is None:
-                negSamusers = users
-                negSamitems = items
-            else:
-                negSamusers = torch.cat([negSamusers, users])
-                negSamitems = torch.cat([negSamitems, items])
-
-        # return posSamusers, posSamitems, negSamusers, negSamitems
-        return torch.cat([posSamusers.long(), negSamusers.long()]), torch.cat([posSamitems.long(), negSamitems.long()])
-
-
-def UniformSample(users, dataset, k=1):
-    """
-    uniformsample k negative items and one positive item for one user
-    return:
-        np.array
-    """
-    dataset: BasicDataset
-    allPos = dataset.getUserPosItems(users)
-    allNeg = dataset.getUserNegItems(users)
-    # allItems = list(range(dataset.m_items))
-    S = []
-    sample_time1 = 0.
-    sample_time2 = 0.
-    total_start = time()
-    for i, user in enumerate(users):
-        start = time()
-        posForUser = allPos[i]
-        # negForUser = dataset.getUserNegItems([user])[0]
-        negForUser = allNeg[i]
-        sample_time2 += time() - start
-
-        start = time()
-        onePos_index = np.random.randint(0, len(posForUser))
-        onePos = posForUser[onePos_index:onePos_index + 1]
-        # onePos     = np.random.choice(posForUser, size=(1, ))
-        kNeg_index = np.random.randint(0, len(negForUser), size=(k,))
-        kNeg = negForUser[kNeg_index]
-        end = time()
-        sample_time1 += end - start
-        S.append(np.hstack([onePos, kNeg]))
-    total = time() - total_start
-    return np.array(S), [total, sample_time1, sample_time2]
-
-
-def UniformSample_allpos(users, dataset, k=4):
-    """
-    uniformsample k negative items and one positive item for one user
-    return:
-        np.array
-    """
-    dataset: BasicDataset
-    allPos = dataset.getUserPosItems(users)
-    allNeg = dataset.getUserNegItems(users)
-    # allItems = list(range(dataset.m_items))
-    S = []
-    sample_time1 = 0.
-    sample_time2 = 0.
-    total_start = time()
-    for i, user in enumerate(users):
-        start = time()
-        posForUser = allPos[i]
-        # negForUser = dataset.getUserNegItems([user])[0]
-        negForUser = allNeg[i]
-        sample_time2 += time() - start
-
-        for positem in posForUser:
-            start = time()
-            # onePos_index = np.random.randint(0, len(posForUser))
-            # onePos     = posForUser[onePos_index:onePos_index+1]
-            # onePos     = np.random.choice(posForUser, size=(1, ))
-            kNeg_index = np.random.randint(0, len(negForUser), size=(k,))
-            kNeg = negForUser[kNeg_index]
-            end = time()
-            sample_time1 += end - start
-            for negitemForpos in kNeg:
-                S.append([user, positem, negitemForpos])
-            # S.append(np.hstack([onePos, kNeg]))
-    total = time() - total_start
-    return np.array(S), [total, sample_time1, sample_time2]
-
-
 def getAllData(dataset, gamma=None):
     """
     return all data (n_users X m_items)
@@ -494,8 +324,11 @@ def getAllData(dataset, gamma=None):
             -1)
     return torch.Tensor(users).long(), torch.Tensor(items).long(), torch.from_numpy(allxijs).long()
 
+# ====================End Samplers=============================
+# =========================================================
 
-# ===================end samplers==========================
+
+# ===================Train Tools===========================
 # =========================================================
 
 def set_seed(seed):
@@ -536,6 +369,10 @@ def shuffle(*arrays, **kwargs):
         return result, shuffle_indices
     else:
         return result
+
+
+# ====================End Train Tools=============================
+# =========================================================
 
 
 # ====================Metrics==============================

@@ -19,10 +19,12 @@ utils.set_seed(world.seed)
 #########################################
 # loading data...
 dataset   = dataloader.LastFM()
-lm_loader = DataLoader(dataset, batch_size=world.config['batch_size'], shuffle=True, drop_last=True) 
+#lm_loader = DataLoader(dataset, batch_size=world.config['batch_size'], shuffle=True, drop_last=True)
 
 world.config['num_users'] = dataset.n_users
 world.config['num_items'] = dataset.m_items
+world.config['neg_prior'] = 52668/(world.config['num_users']*world.config['num_items'] -52668)
+
 #########################################
 #########################################
 # print out
@@ -66,7 +68,7 @@ if globals().get('Varmodel'):
     Varmodel = Varmodel.to(world.device)
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("./runs/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter("/output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
     
