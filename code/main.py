@@ -18,7 +18,7 @@ utils.set_seed(world.seed)
 
 #########################################
 # loading data...
-dataset   = dataloader.LastFM()
+dataset   = dataloader.LastFM(os.path.join(world.DATA_PATH, 'lastfm'))
 #lm_loader = DataLoader(dataset, batch_size=world.config['batch_size'], shuffle=True, drop_last=True)
 
 world.config['num_users'] = dataset.n_users
@@ -56,8 +56,8 @@ elbo = utils.ELBO(world.config,
 # load
 flag = f"{world.sample_type}_{world.rec_type}_{world.var_type}"
 if world.LOAD:
-        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, f'Rec_{flag}.pth.tar')))
-        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, f'Var_{flag}.pth.tar')))
+        Recmodel.load_state_dict(torch.load(os.path.join(world.FILE_PATH, f'Rec_{flag}.pth.tar')))
+        Varmodel.load_state_dict(torch.load(os.path.join(world.FILE_PATH, f'Var_{flag}.pth.tar')))
 ########################################$
 #########################################
 # train
@@ -68,7 +68,9 @@ if globals().get('Varmodel'):
     Varmodel = Varmodel.to(world.device)
 
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("/output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w : SummaryWriter = SummaryWriter(
+                                os.path.join(world.BOARD_PATH, time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+                                )
 else:
     w = None
     

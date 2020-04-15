@@ -10,6 +10,13 @@ from parse import parse_args
 args = parse_args()
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
+ROOT_PATH = "/Users/gus/Desktop/Sampling"
+CODE_PATH = os.path.join(ROOT_PATH, 'code')
+DATA_PATH = os.path.join(ROOT_PATH, 'data')
+OUTPUT_PATH = os.path.join(ROOT_PATH, 'code/output')
+FILE_PATH = os.path.join(ROOT_PATH, 'code/checkpoints')
+BOARD_PATH = os.path.join(ROOT_PATH, 'code/runs')
+
 Recmodels = {
   1:"mf",
 }
