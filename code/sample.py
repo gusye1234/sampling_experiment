@@ -7,6 +7,37 @@ from dataloader import BasicDataset
 from model import VarMF_reg, RecMF, LightGCN_xij_item_personal_matrix
 from time import time
 
+class SampleProGammaSum:
+    def __init__(self, varmodel, dataset):
+        self.varmodel = varmodel
+        self.dataset = dataset
+        #self.num_users = self.dataset.n_users
+        #self.num_items = self.dataset.m_items
+        print('SampleProGammaSum！')
+
+    def compute(self):
+        compute_start = time()
+        (epoch_users, epoch_items, epoch_xij) = utils.getAllData(self.dataset)
+        epoch_users = epoch_users.to(world.device)
+        epoch_items = epoch_items.to(world.device)
+        epoch_xij = epoch_xij.to(world.device)
+        gamma = self.varmodel.sampleGamma(epoch_users, epoch_items, epoch_xij)
+        print('compute time', time()-compute_start)
+        return gamma, epoch_users, epoch_items, epoch_xij
+
+
+
+
+
+    def sample(self, sampleSize):
+        gamma, epoch_users, epoch_items, epoch_xij = self.compute()
+        #gamma = gamma.cpu()
+        G = torch.sum(gamma).item()
+        pij = gamma / G
+        samples_index = torch.multinomial(pij, sampleSize, replacement=True)
+        samples = torch.cat([epoch_users.reshape(-1, 1), epoch_items.reshape(-1,1)], dim=1)
+        return samples[samples_index][:, 0], samples[samples_index][:, 1], epoch_xij[sample_index], G
+
 
 class SamplePersonal:
     def __init__(self, 
