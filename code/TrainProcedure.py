@@ -175,9 +175,9 @@ def sample_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, 
     print(epoch_xij.shape)
     print(f"[sample time]", time() - start)
 
-    epoch_users = epoch_users.to(world.device)
-    epoch_items = epoch_items.to(world.device)
-    epoch_xij = epoch_xij.to(world.device)
+    #epoch_users = epoch_users.to(world.device)
+    #epoch_items = epoch_items.to(world.device)
+    #epoch_xij = epoch_xij.to(world.device)
 
   
     rating = Recmodel(epoch_users, epoch_items)
