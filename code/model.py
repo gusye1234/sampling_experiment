@@ -629,8 +629,12 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         self.drop = self.config['dropout']
         self.emb_decay = self.config['var_weight_decay']
         self.wdecay = self.config['w_weight_decay']
+        self.xdecay = self.config['x_weight_decay']
         # self.weight_decay3 = self.config['w_weight_decay']
         self.Graph = self.dataset.getSparseGraph().coalesce().to(world.device)
+
+
+
 
     def get_user_item_embedding(self):
         with torch.no_grad():
@@ -653,6 +657,7 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
             users_emb = torch.cat([(1 - hyper_x) * self.soft(users_emb), xij_user_emb], dim=1)
             items_emb0 = self.sig(torch.cat([items_emb, xij_item_emb0], dim=1))
             items_emb1 = self.sig(torch.cat([items_emb, xij_item_emb1], dim=1))
+            print('emb', users_emb[:20], items_emb0[:20], items_emb1[:20])
             return users_emb, items_emb0, items_emb1
 
     def __dropout(self, keep_prob):
@@ -690,6 +695,32 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         users, items = torch.split(light_out, [self.num_users, self.num_items])
         return users, items
 
+    def sampleGamma(self, users, items, xij):
+        with torch.no_grad():
+            all_users, all_items = self.computer()
+            users_emb = all_users[users.long()]
+            items_emb = all_items[items.long()]
+
+            hyper_x = self.hyper_x
+            xij_user_emb = torch.tensor([hyper_x] * len(users)).reshape(-1, 1).to(world.device)
+
+            xij_item_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
+            xij_item_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
+            xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
+
+            users_emb = self.w_user(users_emb)
+            items_emb = self.w_item(items_emb)
+
+
+            users_emb = torch.cat([(1 - hyper_x) * self.soft(users_emb), xij_user_emb], dim=1)
+            items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
+
+
+            inner_pro = torch.mul(users_emb, items_emb)
+            gamma = torch.sum(inner_pro, dim=1)
+            return gamma
+
+
     def allGamma(self, users):
         """
         users : (batch_size, dim_var)
@@ -723,17 +754,17 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
 
         reg_loss_emb = (1 / 2) * self.emb_decay * (torch.sum(userEmb_ego ** 2)
                                                    + torch.sum(itemEmb_ego ** 2)
-                                                   + torch.sum(xij_item_emb0 ** 2)
-                                                   + torch.sum(xij_item_emb1 ** 2))
-
-        reg_loss_w = (1 / 2) * self.wdecay * (torch.sum(self.w_user.weight ** 2)
+                                                   + torch.sum(self.w_user.weight ** 2)
                                                    + torch.sum(self.w_item.weight ** 2))
 
+        reg_loss_x = (1 / 2) * self.xdecay * (torch.sum(xij_item_emb0 ** 2)
+                                            + torch.sum(xij_item_emb1 ** 2))
 
-        reg_loss = reg_loss_emb + reg_loss_w
+
+        reg_loss = reg_loss_emb + reg_loss_x
         reg_loss = S / G * reg_loss
-        print('reg loss1 2 ', reg_loss_emb, reg_loss_w)
-        print('decay', self.emb_decay, self.wdecay)
+        print('reg loss1 2 ', reg_loss_emb, reg_loss_x)
+        print('decay', self.emb_decay, self.xdecay)
         # reg_loss = reg_loss / float(len(users))
 
         return gamma, reg_loss
@@ -761,6 +792,7 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         # users_emb = self.soft(torch.cat([users_emb, xij_user_emb], dim=1))
         users_emb = torch.cat([(1 - hyper_x) * self.soft(users_emb), xij_user_emb], dim=1)
         items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
+        print('lgn embedding3', users_emb[0, :], users_emb[7000, :], users_emb[14000, :], items_emb[0:3])
 
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
