@@ -3,6 +3,7 @@ import torch
 from torch import nn, optim
 import numpy as np
 from torch import log
+import utils
 from dataloader import BasicDataset
 from model import VarMF_reg, RecMF, LightGCN_xij_item_personal_matrix
 from time import time
@@ -13,7 +14,7 @@ class SampleProGammaSum:
         self.dataset = dataset
         #self.num_users = self.dataset.n_users
         #self.num_items = self.dataset.m_items
-        print('SampleProGammaSum！')
+        print('SampleProGammaSum')
 
     def compute(self):
         compute_start = time()
@@ -33,10 +34,15 @@ class SampleProGammaSum:
         gamma, epoch_users, epoch_items, epoch_xij = self.compute()
         #gamma = gamma.cpu()
         G = torch.sum(gamma).item()
-        pij = gamma / G
+        pij = (gamma / G).cpu()
         samples_index = torch.multinomial(pij, sampleSize, replacement=True)
+        samples_index = samples_index.to(world.device)
+        print(samples_index)
         samples = torch.cat([epoch_users.reshape(-1, 1), epoch_items.reshape(-1,1)], dim=1)
-        return samples[samples_index][:, 0], samples[samples_index][:, 1], epoch_xij[sample_index], G
+        print(samples.size())
+        print(samples)
+        return samples[samples_index][:, 0], samples[samples_index][:, 1], epoch_xij[samples_index], G
+
 
 
 class SamplePersonal:
@@ -128,8 +134,6 @@ class SamplePersonal:
         Samusers = None
         Samitems = None
         Samxijs  = None
-        print('sample start!!!')
-        sample_start = time()
         for user_id, sample_times in enumerate(expected_Users):
             if sample_times == 0:
                 continue
@@ -143,7 +147,7 @@ class SamplePersonal:
                 Samusers = torch.cat([Samusers, users])
                 Samitems = torch.cat([Samitems, items])
                 Samxijs = torch.cat([Samxijs, xijs])
-        print('final sample time ', time() - sample_start)
+        
         self.__prob.clear()
         return Samusers, Samitems, Samxijs, G.item()
             
@@ -164,22 +168,15 @@ class SamplePersonal:
         index_pos = torch.zeros(self.m_items)
         index_pos[posForuser] = 1
 
-        finalNegItems = []
-        count_neg = 0
-        
-        neg_start = time()
         while True:
             candi_dim = self.__prob['p(k|neg, i)'][user].squeeze()
-            dims = torch.multinomial(candi_dim, 1, replacement=True)
+            dims = torch.multinomial(candi_dim, expected_neg, replacement=True)
             condi_items = self.__prob['p(j|neg,i,k)'][dims]
-            negItems = torch.multinomial(condi_items, 1, replacement=True).squeeze(dim=1)
-            if index_pos[negItems] == 0:
-                count_neg += 1
-                finalNegItems.append(negItems.item())
-            if count_neg == expected_neg:
+            negItems = torch.multinomial(condi_items, 1).squeeze(dim=1)
+            if torch.sum(index_pos[negItems]) > 0:
+                continue
+            else:
                 break
-        negItems = torch.tensor(finalNegItems)
-        
         xijs0 = torch.Tensor([0]*expected_neg.item())
         if posItems is None:
             return negItems.long(), xijs0
