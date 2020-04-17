@@ -11,7 +11,7 @@ from pprint import pprint
 import os
 import time
 import register
-from sample import SamplePersonal
+from sample import SamplePersonal, SampleProGammaSum
 
 
 utils.set_seed(world.seed)
@@ -45,7 +45,7 @@ Recmodel = register.Rec_register[world.rec_type](world.config)
 Varmodel = register.Var_register[world.var_type](world.config)
 train_method = register.sampling_register[world.sample_type]
 if world.sample_type == 'fast_sampling':
-    sampler = SamplePersonal(Varmodel, dataset)
+    sampler = SampleProGammaSum(Varmodel, dataset)
 else:
     sampler = None
 elbo = utils.ELBO(world.config,
