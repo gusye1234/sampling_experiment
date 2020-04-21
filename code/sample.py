@@ -87,6 +87,7 @@ class SamplePersonal:
         #print('epochk', all_sample_times)
         for user_id, sample_times in enumerate(all_sample_times):
             if sample_times == 0:
+                
                 continue
             items, xijs = self.sampleForUser(user_id, candi_neg_items)
             users = torch.Tensor([user_id] * len(items)).long()
