@@ -58,7 +58,7 @@ config['ex_prior'] = args.exprior
 # ===============================
 config['xij_dim'] = 1
 # ======================
-TRAIN_epochs = 1000
+TRAIN_epochs = 1001
 LOAD = False
 PATH = '../checkpoints'
 top_k = 5
