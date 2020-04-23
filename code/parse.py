@@ -15,25 +15,23 @@ def parse_args():
                         help="learning rate for var model")
     parser.add_argument('--wdecay', type=float,default=0.1,
                         help="weight decay for var model w")
-    parser.add_argument('--xdecay', type=float,default=10,
+    parser.add_argument('--xdecay', type=float,default=0.1,
                         help="weight decay for var model x")
-    parser.add_argument('--vardecay', type=float,default=0.1,
+    parser.add_argument('--vardecay', type=float,default=1,
                         help="weight decay for var model embedding")
-    parser.add_argument('--gamma_KL', type=float,default=0,
-                        help="prior KL")
     parser.add_argument('--recdecay', type=float,default=1,
                         help="weight decay for rec model")
     parser.add_argument('--layer', type=int,default=2,
                         help="the layer num of lightGCN")
     parser.add_argument('--hyperx', type=float, default=0.5,
                         help='hyper parameter in x dimension')
+    parser.add_argument('--exprior', type=float, default=0.1,
+                        help='exposure prior')
     parser.add_argument('--dropout', type=bool,default=False,
                         help="using the dropout or not")
     parser.add_argument('--keepprob', type=float,default=0.6,
                         help="the batch size for bpr loss training procedure")
-    parser.add_argument('--testbatch', type=int,default=100,
-                        help="the batch size of users for testing")
-    parser.add_argument('--ontest', type=int,default=0,
+    parser.add_argument('--ontest', type=int,default=1,
                         help="set 1 to run test on test1.txt, set 0 to run test on validation.txt")
     parser.add_argument('--path', type=str,default="./checkpoints",
                         help="path to save weights")
@@ -41,10 +39,7 @@ def parse_args():
                         help="enable tensorboard")
     parser.add_argument('--comment', type=str,default="lgn")
     parser.add_argument('--load', type=bool,default=False)
-    parser.add_argument('--epochs', type=int,default=100)
-    parser.add_argument('--vartype', type=int, default=5,
-                        help="var model types")
-    parser.add_argument('--sampletype', type=int, default=5,
+    parser.add_argument('--sampletype', type=int, default=2,
                         help="sampling methods types")
     parser.add_argument('--seed', type=int, default=2020,
                         help="random seed")

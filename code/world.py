@@ -10,24 +10,13 @@ from parse import parse_args
 args = parse_args()
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-ROOT_PATH = "/Users/gus/Desktop/Sampling"
-CODE_PATH = os.path.join(ROOT_PATH, 'code')
-DATA_PATH = os.path.join(ROOT_PATH, 'data')
-OUTPUT_PATH = os.path.join(ROOT_PATH, 'code/output')
-FILE_PATH = os.path.join(ROOT_PATH, 'code/checkpoints')
-BOARD_PATH = os.path.join(ROOT_PATH, 'code/runs')
-
 Recmodels = {
-  1:"mf",
+  1:"mf"
 }
 
 Varmodels = {
-  1:'mf',
-  2:'mf_itemper',
-  3:'lgn',
-  4:'lgn_itemper_single',
-  5:'lgn_itemper_matrix',
-  6:'lgn_itemper_matrix_nohyper'
+  1:'lgn_itemper_matrix'
+
 }
 
 losses = {
@@ -35,16 +24,13 @@ losses = {
 }
 
 samplings = {
-  1: 'all_data',
-  2: 'all_data_xij',
-  3: 'all_data_nobatch',
-  4: 'all_data_nobatch_xij',
-  5: 'fast_sampling', # not yet,
+  1: 'all_data_nobatch_xij',
+  2: 'fast_sampling'
 }
 
 
 rec_type = Recmodels[1]
-var_type = Varmodels[args.vartype]
+var_type = Varmodels[1]
 loss_type = losses[1]
 sample_type = samplings[args.sampletype]
 
@@ -66,17 +52,13 @@ config['rec_weight_decay'] = args.recdecay
 config['var_weight_decay'] = args.vardecay
 config['x_weight_decay'] = args.xdecay
 config['w_weight_decay'] = args.wdecay
-config['gamma_KL'] = args.gamma_KL
 config['lightGCN_n_layers']= args.layer
 config['hyper_x'] = args.hyperx
+config['ex_prior'] = args.exprior
 # ===============================
-config['batch_size'] = 32768
-config['all_batch_size'] = 32768
-config['test_u_batch_size'] = 100
 config['xij_dim'] = 1
-config['num_xij'] = 1
 # ======================
-TRAIN_epochs = 1001
+TRAIN_epochs = 1000
 LOAD = False
 PATH = '../checkpoints'
 top_k = 5
@@ -89,7 +71,6 @@ CORES = multiprocessing.cpu_count() // 2
 multi_cores = False
 ontest = args.ontest
 seed = args.seed
-
 
 # let pandas shut up
 from warnings import simplefilter

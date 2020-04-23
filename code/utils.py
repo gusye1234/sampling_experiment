@@ -8,7 +8,7 @@ from torch import nn, optim
 import numpy as np
 from torch import log
 from dataloader import BasicDataset
-from model import VarMF_reg, RecMF
+
 from time import time
 
 
@@ -25,25 +25,19 @@ class ELBO:
     """
     eps = torch.Tensor([1e-8]).float().to(world.device)
 
-    def __init__(self, config,
-                 rec_model, var_model):
+    def __init__(self, config, rec_model, var_model):
         rec_model: nn.Module
         var_model: nn.Module
         self.epsilon = torch.Tensor([config['epsilon']]).to(world.device)
-        self.eta = torch.Tensor([config['eta']]).to(world.device)
         self.bce = nn.BCELoss()
         rec_lr = config['rec_lr']
         var_lr = config['var_lr']
-        self.gamma_KL = config['gamma_KL']
+        self.exprior = config['ex_prior']
+        print('exprior', self.exprior)
+
         self.optFortheta = optim.Adam(rec_model.parameters(), lr=rec_lr, weight_decay=config['rec_weight_decay'])
         self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr)
-        #self.no_var_decay = world.var_type.startswith('lgn')
-          
-        #if self.no_var_decay:
-            #self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr)    
-        #else:
-            #print('optimizer weight decay!')
-            #self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr, weight_decay=config['var_weight_decay'])
+        print('ELBO Init!')
 
     def stageTwoPrior(self, rating, gamma, xij, pij=None, reg_loss=None):
         """
@@ -68,124 +62,50 @@ class ELBO:
 
         gamma = gamma + self.eps
 
-        eta = xij * 1.0 + (1 - xij) * 0.1
-        print(eta[0:3], eta[37:40])
+        eta = xij * 1.0 + (1 - xij) * self.exprior
+        print('eta', eta)
         same_term = log((1 - eta + self.eps) / (1 - gamma + 2 * self.eps))
         part_one = xij * log((rating + self.eps) / self.epsilon) \
                    + (1 - xij) * log((1 - rating + self.eps) / (1 - self.epsilon)) \
                    + log(eta / gamma) \
                    - same_term
-        #out_one = (part_one * gamma).detach()
+
         part_two = (self.cross(xij, self.epsilon) + same_term)
-        #out_two = part_two.detach()
+
         if pij is None:
             part_one = part_one * gamma
-            print('gamma', gamma[:100])
             part_two = part_two
-            print('stagetwo pij prior 0.1 ')
+
         else:
-            print('pro to gamma stagetwoPrior!')
+            print('Pro to gamma stagetwo!')
             pij = (pij + self.eps).detach()
-            print('pij',pij)
             part_one = part_one * gamma / pij
             part_two = part_two / pij
-
-        #out_loss = -(torch.sum(out_one) + torch.sum(out_two))
 
         loss1 = torch.sum(part_one)
         loss2 = torch.sum(part_two)
         loss: torch.Tensor = -(loss1 + loss2)
-
-        if reg_loss is not None:
-            print(loss, reg_loss)
-            loss = loss + reg_loss
-            print('reg+loss', loss)
-
-        if torch.isnan(loss) or torch.isinf(loss):
-            print('part_one:', part_one)
-            print('part_two:', part_two)
-            print("loss1:", loss1)
-            print("loss2:", loss2)
-            raise ValueError("nan or inf")
         cri = loss.data
 
-        self.optForvar.zero_grad()
-        loss.backward()
-        self.optForvar.step()
-
-        return cri
-
-
-    def stageTwo_Prior_KL(self, rating, gamma, xij, pij=None, reg_loss = None):
-        """
-        using the same data as stage one.
-        we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
-        unbiased_loss = BCE(xij, rating_ij)*len(batch)
-                        + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
-                        + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
-        """
-        rating: torch.Tensor
-        gamma: torch.Tensor
-        xij: torch.Tensor
-
-        try:
-            assert rating.size() == gamma.size() == xij.size()
-            assert len(rating.size()) == 1
-            if pij is not None:
-                assert rating.size() == pij.size()
-        except ValueError:
-            print("input error!")
-            print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
-
-        gamma = gamma + self.eps
-
-        
-        print('gamma', gamma[:10])
-        part_one =  self.cross(xij, rating)
-        part_two =  self.cross(xij, self.epsilon)
-        part_tre =  gamma*(log(self.eta)-log(gamma)) + (1-gamma)*(log(1-self.eta)-log(1-gamma + 2*ELBO.eps))
-        print('part', part_one[:10], part_two[:10], part_tre[:10])
-        if pij is None:      
-            part_one = part_one * gamma
-            part_two = part_two * (1 - gamma)
-            print('part gamma', part_one[:10], part_two[:10],part_tre[:10])
-            print('stagetwoNoPrior pij None!!!')
-        else:
-            pij = (pij + self.eps).detach()
-            part_one = part_one * gamma / pij
-            part_two = part_two * (1 - gamma)/ pij
-            part_tre = part_tre/pij
-        out_loss = -(torch.sum(part_one) + torch.sum(part_two)+self.gamma_KL*torch.sum(part_tre)).data
-
-        loss1 = torch.sum(part_one)
-        loss2 = torch.sum(part_two)
-        loss3 = torch.sum(part_tre)
-        print('loss1 2 3', loss1, loss2, loss3)
-        print(self.gamma_KL)
-        loss: torch.Tensor = -(loss1 + loss2 + self.gamma_KL*loss3)
-        print('gamma_KL', self.gamma_KL)
-        print('loss', loss)
-        
         if reg_loss is not None:
-            print(loss, reg_loss)
+            print('loss regloss', loss, reg_loss)
             loss = loss + reg_loss
             print('reg+loss', loss)
-            
-        
+
         if torch.isnan(loss) or torch.isinf(loss):
             print('part_one:', part_one)
             print('part_two:', part_two)
             print("loss1:", loss1)
             print("loss2:", loss2)
             raise ValueError("nan or inf")
-        
-        cri = out_loss
+
 
         self.optForvar.zero_grad()
         loss.backward()
         self.optForvar.step()
 
         return cri
+
 
 
     def stageOne(self, rating, xij, gamma=None, pij=None):
@@ -220,72 +140,6 @@ class ELBO:
         self.optFortheta.step()
         return cri
 
-    def stageTwo(self, rating, gamma, xij, pij=None, reg_loss = None):
-        """
-        using the same data as stage one.
-        we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
-        unbiased_loss = BCE(xij, rating_ij)*len(batch)
-                        + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
-                        + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
-        """
-        rating: torch.Tensor
-        gamma: torch.Tensor
-        xij: torch.Tensor
-
-        try:
-            assert rating.size() == gamma.size() == xij.size()
-            assert len(rating.size()) == 1
-            if pij is not None:
-                assert rating.size() == pij.size()
-        except ValueError:
-            print("input error!")
-            print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
-
-        gamma = gamma + self.eps
-
-        same_term = log((1 - self.eta + self.eps) / (1 - gamma + 2 * self.eps))
-        part_one = xij * log((rating + self.eps) / self.epsilon) \
-                   + (1 - xij) * log((1 - rating + self.eps) / (1 - self.epsilon)) \
-                   + log(self.eta / gamma) \
-                   - same_term
-        out_one = (part_one * gamma).detach()
-        part_two = (self.cross(xij, self.epsilon) + same_term)
-        out_two = part_two.detach()
-        if pij is None:      
-            part_one = part_one * gamma
-            print('gamma', gamma[:1000])       
-            part_two = part_two
-            print('stagetwo pij None')
-        else:
-            pij = (pij + self.eps).detach()
-            part_one = part_one * gamma / pij
-            part_two = part_two / pij
-
-        out_loss = -(torch.sum(out_one) + torch.sum(out_two))
-
-        loss1 = torch.sum(part_one)
-        loss2 = torch.sum(part_two)
-        loss: torch.Tensor = -(loss1 + loss2)
-        
-        if reg_loss is not None:
-            print(loss, reg_loss)
-            loss = loss + reg_loss
-            print('reg+loss', loss)
-            
-        
-        if torch.isnan(loss) or torch.isinf(loss):
-            print('part_one:', part_one)
-            print('part_two:', part_two)
-            print("loss1:", loss1)
-            print("loss2:", loss2)
-            raise ValueError("nan or inf")
-        cri = out_loss.item()
-
-        self.optForvar.zero_grad()
-        loss.backward()
-        self.optForvar.step()
-
-        return cri
 
     @staticmethod
     def cross(a, b):
@@ -337,38 +191,6 @@ def set_seed(seed):
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
     torch.manual_seed(seed)
-
-def minibatch(*tensors, **kwargs):
-    batch_size = kwargs.get('batch_size', world.config['batch_size'])
-
-    if len(tensors) == 1:
-        tensor = tensors[0]
-        for i in range(0, len(tensor), batch_size):
-            yield tensor[i:i + batch_size]
-    else:
-        for i in range(0, len(tensors[0]), batch_size):
-            yield tuple(x[i:i + batch_size] for x in tensors)
-
-
-def shuffle(*arrays, **kwargs):
-    require_indices = kwargs.get('indices', False)
-
-    if len(set(len(x) for x in arrays)) != 1:
-        raise ValueError('All inputs to shuffle must have '
-                         'the same length.')
-
-    shuffle_indices = np.arange(len(arrays[0]))
-    np.random.shuffle(shuffle_indices)
-
-    if len(arrays) == 1:
-        result = arrays[0][shuffle_indices]
-    else:
-        result = tuple(x[shuffle_indices] for x in arrays)
-
-    if require_indices:
-        return result, shuffle_indices
-    else:
-        return result
 
 
 # ====================End Train Tools=============================
@@ -492,23 +314,3 @@ def NDCGatK(test_data, pred_data, k):
 # ====================end Metrics=============================
 # =========================================================
 
-
-if __name__ == "__main__":
-    config = {'epsilon': 0.001, 'eta': 0.5}
-    test_rating = torch.rand(10, 1)
-    test_gamma = torch.rand(10, 1)
-    test_xij = torch.rand(10, 1)
-    # loss_test = ELBO(config)
-
-    from pprint import pprint
-
-    world.config['num_users'] = 4000
-    world.config['num_items'] = 8000
-    text_sample = VarMF_reg(world.config)
-    sampler = Sample_MF(k=10, var_model=text_sample)
-    for i in range(10):
-        sampler.compute()
-        users, items = sampler.sample()
-        print("==")
-        pprint(users)
-        pprint(items)
