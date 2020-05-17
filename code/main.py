@@ -18,12 +18,11 @@ utils.set_seed(world.seed)
 
 #########################################
 # loading data...
-dataset   = dataloader.LastFM(os.path.join(world.DATA_PATH, 'lastfm'))
-#lm_loader = DataLoader(dataset, batch_size=world.config['batch_size'], shuffle=True, drop_last=True)
+# dataset   = dataloader.Ciao()
+dataset   = dataloader.LastFM()
 
 world.config['num_users'] = dataset.n_users
 world.config['num_items'] = dataset.m_items
-world.config['neg_prior'] = 52668/(world.config['num_users']*world.config['num_items'] -52668)
 
 #########################################
 #########################################
@@ -44,8 +43,9 @@ world.config['dataset'] = dataset
 Recmodel = register.Rec_register[world.rec_type](world.config)
 Varmodel = register.Var_register[world.var_type](world.config)
 train_method = register.sampling_register[world.sample_type]
+
 if world.sample_type == 'fast_sampling':
-    sampler = SampleProGammaSum(Varmodel, dataset)
+    sampler = SamplePersonal(Varmodel, dataset)
 else:
     sampler = None
 elbo = utils.ELBO(world.config,
@@ -56,21 +56,20 @@ elbo = utils.ELBO(world.config,
 # load
 flag = f"{world.sample_type}_{world.rec_type}_{world.var_type}"
 if world.LOAD:
-        Recmodel.load_state_dict(torch.load(os.path.join(world.FILE_PATH, f'Rec_{flag}.pth.tar')))
-        Varmodel.load_state_dict(torch.load(os.path.join(world.FILE_PATH, f'Var_{flag}.pth.tar')))
+        Recmodel.load_state_dict(torch.load(os.path.join(world.PATH, f'Rec_{flag}.pth.tar')))
+        Varmodel.load_state_dict(torch.load(os.path.join(world.PATH, f'Var_{flag}.pth.tar')))
 ########################################$
 #########################################
 # train
-Neg_k = 1
-world.config['total_batch'] = int(len(dataset)/world.config['batch_size'])
+
+
 Recmodel = Recmodel.to(world.device)
 if globals().get('Varmodel'):
     Varmodel = Varmodel.to(world.device)
 
+
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter(
-                                os.path.join(world.BOARD_PATH, time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
-                                )
+    w : SummaryWriter = SummaryWriter("./outputs/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
 else:
     w = None
     
@@ -92,7 +91,13 @@ try:
             testDict = dataset.getTestDict()
             TrainProcedure.Test(dataset, Recmodel, Varmodel, world.top_k, i, w)
         print("total time:", time.time() - start)
+
+    with torch.no_grad():
+        print("save")
+        user_emb, item_emb0, item_emb1 = Varmodel.get_user_item_embedding()
+        np.savetxt('lgn_xij_user_emb.txt', np.array(user_emb.cpu().detach().numpy()))
+        np.savetxt('lgn_xij_item_emb0_.txt', np.array(item_emb0.cpu().detach().numpy()))
+        np.savetxt('lgn_xij_item_emb1.txt', np.array(item_emb1.cpu().detach().numpy()))
 finally:
     if world.tensorboard:
         w.close()
-#########################################
