@@ -45,7 +45,7 @@ class ELBO:
             #print('optimizer weight decay!')
             #self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr, weight_decay=config['var_weight_decay'])
 
-    def stageTwoPrior(self, rating, gamma, xij, pij=None, reg_loss=None):
+    def stageTwoPrior(self, rating, gamma, xij, pij=None, reg_loss=None, wait=False):
         """
         using the same data as stage one.
         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
@@ -109,14 +109,17 @@ class ELBO:
             raise ValueError("nan or inf")
         cri = loss.data
 
-        self.optForvar.zero_grad()
-        loss.backward()
-        self.optForvar.step()
+        if wait:
+            loss.backward()
+        else:
+            loss.backward()
+            self.optForvar.step()
+            self.optForvar.zero_grad()
 
         return cri
 
 
-    def stageTwo_Prior_KL(self, rating, gamma, xij, pij=None, reg_loss = None):
+    def stageTwo_Prior_KL(self, rating, gamma, xij, pij=None, reg_loss = None, wait=False):
         """
         using the same data as stage one.
         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
@@ -181,14 +184,17 @@ class ELBO:
         
         cri = out_loss
 
-        self.optForvar.zero_grad()
-        loss.backward()
-        self.optForvar.step()
+        if wait:
+            loss.backward()
+        else:
+            loss.backward()
+            self.optForvar.step()
+            self.optForvar.zero_grad()
 
         return cri
 
 
-    def stageOne(self, rating, xij, gamma=None, pij=None):
+    def stageOne(self, rating, xij, gamma=None, pij=None, wait=False):
         """
         optimize recommendation parameters
         same as samwalk, using BCE loss here
@@ -215,12 +221,15 @@ class ELBO:
             loss: torch.Tensor = -torch.sum(part_one)
 
         cri = loss.data
-        self.optFortheta.zero_grad()
-        loss.backward()
-        self.optFortheta.step()
+        if wait:
+            loss.backward()
+        else:
+            loss.backward()
+            self.optFortheta.step()
+            self.optFortheta.zero_grad()
         return cri
 
-    def stageTwo(self, rating, gamma, xij, pij=None, reg_loss = None):
+    def stageTwo(self, rating, gamma, xij, pij=None, reg_loss = None, wait=False):
         """
         using the same data as stage one.
         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
@@ -253,7 +262,6 @@ class ELBO:
         out_two = part_two.detach()
         if pij is None:      
             part_one = part_one * gamma
-            print('gamma', gamma[:1000])       
             part_two = part_two
             print('stagetwo pij None')
         else:
@@ -281,9 +289,12 @@ class ELBO:
             raise ValueError("nan or inf")
         cri = out_loss.item()
 
-        self.optForvar.zero_grad()
-        loss.backward()
-        self.optForvar.step()
+        if wait:
+            loss.backward()
+        else:
+            loss.backward()
+            self.optForvar.step()
+            self.optForvar.zero_grad()
 
         return cri
 

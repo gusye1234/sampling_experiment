@@ -11,7 +11,7 @@ from pprint import pprint
 import os
 import time
 import register
-from sample import SamplePersonal, SampleProGammaSum
+from sample import SamplePersonal
 
 
 utils.set_seed(world.seed)

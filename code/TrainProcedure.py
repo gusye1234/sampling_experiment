@@ -79,8 +79,17 @@ def all_data_xij(dataset, recommend_model, var_model, loss_class, epoch, w=None,
     (epoch_users, epoch_items, epoch_xij) = utils.getAllData(dataset)
     epoch_users, epoch_items, epoch_xij = utils.shuffle(epoch_users, epoch_items, epoch_xij)
     datalen = len(epoch_users)
+    batch_num = (datalen // world.config['batch_size'])
+    if (datalen - batch_num*world.config['batch_size']) > 0:
+        batch_num += 1
     
-    for (batch_i, (batch_users, batch_items, batch_xij)) in enumerate(utils.minibatch(epoch_users, epoch_items, epoch_xij)):
+    for (batch_i, (batch_users, 
+                   batch_items, 
+                   batch_xij)) in enumerate(utils.minibatch(epoch_users, 
+                                                            epoch_items, 
+                                                            epoch_xij)):
+        STEP = (batch_i != (batch_num - 1))
+        print(STEP)
         batch_users = batch_users.to(world.device)
         batch_items = batch_items.to(world.device)
         batch_xij = batch_xij.to(world.device)
@@ -90,18 +99,18 @@ def all_data_xij(dataset, recommend_model, var_model, loss_class, epoch, w=None,
         Varmodel.eval()
         rating = Recmodel(batch_users, batch_items)
         batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
-        loss1 = loss_class.stageOne(rating, batch_xij, batch_gamma)
+        loss1 = loss_class.stageOne(rating, batch_xij, batch_gamma, wait=STEP)
 
         Recmodel.eval()
         Varmodel.train()
         rating = Recmodel(batch_users, batch_items)
         
         if lgn:
-            batch_gamma, reg_loss = Varmodel.forwardWithReg(batch_users, batch_items, batch_xij)
-            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, reg_loss=reg_loss)
+            batch_gamma, reg_loss = Varmodel.forwardWithReg(batch_users, batch_items, batch_xij, G=1, S=datalen)
+            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, reg_loss=reg_loss, wait=STEP)
         else:
             batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
-            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij)
+            loss2 = loss_class.stageTwo(rating, batch_gamma, batch_xij, wait=STEP)
 
         if world.tensorboard:
             w.add_scalar(flag+'/stageone', loss1, epoch*round(datalen/world.config['batch_size']) + batch_i)

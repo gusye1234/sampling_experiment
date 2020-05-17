@@ -608,7 +608,6 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
         nn.init.uniform_(self.embedding_user.weight, a=-1, b=1)
         nn.init.uniform_(self.embedding_item.weight, a=-1, b=1)
-        print(self.embedding_user.weight[0:2], self.embedding_item.weight[0:2])
         print('use nn.init.uniform initilizer')
 
         # self.embedding_user_xij = torch.nn.Embedding(num_embeddings=self.num_users, embedding_dim=self.xij_dim)
@@ -621,8 +620,6 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         # eye = torch.eye(self.latent_dim, self.latent_dim)
         # self.w_user.weight.data.copy_(eye)
         # self.w_item.weight.data.copy_(eye)
-        print(self.w_user.weight)
-        print(self.w_item.weight)
 
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
@@ -657,7 +654,6 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
             users_emb = torch.cat([(1 - hyper_x) * self.soft(users_emb), xij_user_emb], dim=1)
             items_emb0 = self.sig(torch.cat([items_emb, xij_item_emb0], dim=1))
             items_emb1 = self.sig(torch.cat([items_emb, xij_item_emb1], dim=1))
-            print('emb', users_emb[:20], items_emb0[:20], items_emb1[:20])
             return users_emb, items_emb0, items_emb1
 
     def __dropout(self, keep_prob):
@@ -763,8 +759,6 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
 
         reg_loss = reg_loss_emb + reg_loss_x
         reg_loss = S / G * reg_loss
-        print('reg loss1 2 ', reg_loss_emb, reg_loss_x)
-        print('decay', self.emb_decay, self.xdecay)
         # reg_loss = reg_loss / float(len(users))
 
         return gamma, reg_loss
@@ -784,15 +778,11 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         xij_item_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
         xij_item_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
-        print('linear trans', self.w_user.weight, self.w_item.weight)
-        print('lgn embedding1', users_emb[0, :], users_emb[7000, :], users_emb[14000, :], items_emb[0:3])
         users_emb = self.w_user(users_emb)
         items_emb = self.w_item(items_emb)
-        print('lgn embedding2', users_emb[0, :], users_emb[7000, :], users_emb[14000, :], items_emb[0:3])
         # users_emb = self.soft(torch.cat([users_emb, xij_user_emb], dim=1))
         users_emb = torch.cat([(1 - hyper_x) * self.soft(users_emb), xij_user_emb], dim=1)
         items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
-        print('lgn embedding3', users_emb[0, :], users_emb[7000, :], users_emb[14000, :], items_emb[0:3])
 
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
@@ -945,7 +935,6 @@ class LightGCN_xij_item_personal_matrix_nohyper(nn.Module):
                                                   +torch.sum(xij_item_emb1 ** 2))
 
                                     
-        print('decay', self.lgn_decay, self.x_decay)
         #reg_loss = reg_loss / float(len(users))
         reg_loss = reg_loss_emb + reg_loss_x
         return gamma, reg_loss
@@ -964,7 +953,6 @@ class LightGCN_xij_item_personal_matrix_nohyper(nn.Module):
         # xij_item_emb1 = self.embedding_item_xij1(items.long())
         # xij_item_emb0 = self.embedding_item_xij0(items.long())
         # xij_item_emb = xij_item_emb1 * xij.reshape(-1, 1) + xij_item_emb0 * (1 - xij.reshape(-1, 1))
-        print('emb1', users_emb[:3], items_emb[:3])
         xij_user_emb = self.embedding_user_xij(users.long())
         
         xij_item_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
@@ -973,12 +961,8 @@ class LightGCN_xij_item_personal_matrix_nohyper(nn.Module):
         
         users_emb = self.w_user(users_emb)
         items_emb = self.w_item(items_emb)
-        print('linear tranlation', self.w_user.weight, self.w_item.weight)
-        print('emb2', users_emb[:3], items_emb[:3])
         users_emb = self.soft(torch.cat([users_emb, xij_user_emb], dim=1))
         items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
-
-        print('emb3', users_emb[:3], items_emb[:3])
 
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
