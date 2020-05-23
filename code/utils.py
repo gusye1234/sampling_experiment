@@ -23,14 +23,13 @@ class ELBO:
         gamma  : shape(batch_size, 1)
         xij    : shape(batch_size, 1)
     """
-    eps = torch.Tensor([1e-8]).float().to(world.device)
+    eps = torch.FloatTensor([1e-8]).to(world.device)
 
     def __init__(self, config, rec_model, var_model):
         rec_model: nn.Module
         var_model: nn.Module
-        self.epsilon = torch.Tensor([config['epsilon']]).to(world.device)
+        self.epsilon = torch.FloatTensor([config['epsilon']]).to(world.device)
         self.bce = nn.BCELoss()
-        self.eta = 0.5
         rec_lr = config['rec_lr']
         var_lr = config['var_lr']
         self.exprior = config['ex_prior']
@@ -38,9 +37,11 @@ class ELBO:
 
         self.optFortheta = optim.Adam(rec_model.parameters(), lr=rec_lr, weight_decay=config['rec_weight_decay'])
         self.optForvar = optim.Adam(var_model.parameters(), lr=var_lr)
+        self.optFortheta.zero_grad()
+        self.optForvar.zero_grad()
         print('ELBO Init!')
 
-    def stageTwoPrior(self, rating, gamma, xij, pij=None, reg_loss=None, wait=False):
+    def stageTwoPrior(self, rating, gamma, xij, pij=None, reg_loss=None):
         """
         using the same data as stage one.
         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
@@ -48,9 +49,9 @@ class ELBO:
                         + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
                         + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
         """
-        rating: torch.Tensor
-        gamma: torch.Tensor
-        xij: torch.Tensor
+        rating: torch.FloatTensor
+        gamma: torch.FloatTensor
+        xij: torch.LongTensor
 
         try:
             assert rating.size() == gamma.size() == xij.size()
@@ -61,10 +62,12 @@ class ELBO:
             print("input error!")
             print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
 
+
+              
         gamma = gamma + self.eps
 
         eta = xij * 1.0 + (1 - xij) * self.exprior
-        print('eta', eta)
+        #print('eta', eta)
         same_term = log((1 - eta + self.eps) / (1 - gamma + 2 * self.eps))
         part_one = xij * log((rating + self.eps) / self.epsilon) \
                    + (1 - xij) * log((1 - rating + self.eps) / (1 - self.epsilon)) \
@@ -99,51 +102,16 @@ class ELBO:
             print("loss1:", loss1)
             print("loss2:", loss2)
             raise ValueError("nan or inf")
-        cri = loss.data
 
-        if wait:
-            loss.backward()
-        else:
-            loss.backward()
-            self.optForvar.step()
-            self.optForvar.zero_grad()
+        self.optForvar.zero_grad()
+        loss.backward()
+        self.optForvar.step()
 
         return cri
 
 
-    def stageTwo_Prior_KL(self, rating, gamma, xij, pij=None, reg_loss = None, wait=False):
-        """
-        using the same data as stage one.
-        we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
-        unbiased_loss = BCE(xij, rating_ij)*len(batch)
-                        + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
-                        + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
-        """
-        rating: torch.Tensor
-        gamma: torch.Tensor
-        xij: torch.Tensor
 
-        try:
-            assert rating.size() == gamma.size() == xij.size()
-            assert len(rating.size()) == 1
-            if pij is not None:
-                assert rating.size() == pij.size()
-        except ValueError:
-            print("input error!")
-            print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
-
-
-        if wait:
-            loss.backward()
-        else:
-            loss.backward()
-            self.optForvar.step()
-            self.optForvar.zero_grad()
-
-        return cri
-
-
-    def stageOne(self, rating, xij, gamma=None, pij=None, wait=False):
+    def stageOne(self, rating, xij, gamma=None, pij=None):
         """
         optimize recommendation parameters
         same as samwalk, using BCE loss here
@@ -151,9 +119,10 @@ class ELBO:
         so if we divide loss by pij, then the rij coefficient will be eliminated.
         And we get BCE loss here(without `mean`)
         """
-        rating: torch.Tensor
-        gamma: torch.Tensor
-        xij: torch.Tensor
+        rating: torch.FloatTensor
+        gamma: torch.FloatTensor
+        xij: torch.LongTensor
+
 
         if pij is None:
             if gamma is None:
@@ -161,24 +130,58 @@ class ELBO:
                                  to calculate the loss for recommendation model")
             part_one = self.cross(xij, rating)
             part_one = part_one * gamma.detach()
-            loss: torch.Tensor = -torch.sum(part_one)
+            loss: torch.FloatTensor = -torch.sum(part_one)
             print('stageone pij None')
 
         else:
             print('pro to gamma stageone!')
             part_one = self.cross(xij, rating)
-            loss: torch.Tensor = -torch.sum(part_one)
+            loss: torch.FloatTensor = -torch.sum(part_one)
+
+        cri = loss.data
+        self.optFortheta.zero_grad()
+        loss.backward()
+        self.optFortheta.step()
+        return cri
+
+    def stageOneAcc(self, rating, xij, gamma=None, pij=None, wait=False):
+        """
+        optimize recommendation parameters
+        same as samwalk, using BCE loss here
+        p(user_i,item_j) = p(item_j|user_i)p(user_i).And p(user_i) \propto 1
+        so if we divide loss by pij, then the rij coefficient will be eliminated.
+        And we get BCE loss here(without `mean`)
+        """
+        rating: torch.FloatTensor
+        gamma: torch.FloatTensor
+        xij: torch.LongTensor
+
+
+        if pij is None:
+            if gamma is None:
+                raise ValueError("You should input gamma and pij in the same time  \
+                                 to calculate the loss for recommendation model")
+            part_one = self.cross(xij, rating)
+            part_one = part_one * gamma.detach()
+            loss: torch.FloatTensor = -torch.sum(part_one)
+
+        else:
+            part_one = self.cross(xij, rating)
+            loss: torch.FloatTensor = -torch.sum(part_one)
+
 
         cri = loss.data
         if wait:
             loss.backward()
+
         else:
             loss.backward()
             self.optFortheta.step()
             self.optFortheta.zero_grad()
+
         return cri
 
-    def stageTwo(self, rating, gamma, xij, pij=None, reg_loss = None, wait=False):
+    def stageTwoAcc(self, rating, gamma, xij, pij=None, reg_loss=None, wait=False):
         """
         using the same data as stage one.
         we have r_{ij} \propto p_{ij}, so we need to divide pij for unbiased gradient.
@@ -186,9 +189,9 @@ class ELBO:
                         + (1-gamma_ij)/gamma_ij * cross(xij, epsilon)
                         + (cross(gamma_ij, eta_ij) + cross(gamma_ij, gamma_ij))/r_ij
         """
-        rating: torch.Tensor
-        gamma: torch.Tensor
-        xij: torch.Tensor
+        rating: torch.FloatTensor
+        gamma: torch.FloatTensor
+        xij: torch.LongTensor
 
         try:
             assert rating.size() == gamma.size() == xij.size()
@@ -199,44 +202,43 @@ class ELBO:
             print("input error!")
             print(f"Got rating{rating.size()}, gamma{gamma.size()}, xij{xij.size()}")
 
+
         gamma = gamma + self.eps
 
-        same_term = log((1 - self.eta + self.eps) / (1 - gamma + 2 * self.eps))
+        eta = xij * 1.0 + (1 - xij) * self.exprior
+        # print('eta', eta)
+        same_term = log((1 - eta + self.eps) / (1 - gamma + 2 * self.eps))
         part_one = xij * log((rating + self.eps) / self.epsilon) \
                    + (1 - xij) * log((1 - rating + self.eps) / (1 - self.epsilon)) \
-                   + log(self.eta / gamma) \
+                   + log(eta / gamma) \
                    - same_term
-        out_one = (part_one * gamma).detach()
+
         part_two = (self.cross(xij, self.epsilon) + same_term)
-        out_two = part_two.detach()
-        if pij is None:      
+
+        if pij is None:
             part_one = part_one * gamma
             part_two = part_two
-            print('stagetwo pij None')
+
+
         else:
             pij = (pij + self.eps).detach()
             part_one = part_one * gamma / pij
             part_two = part_two / pij
 
-        out_loss = -(torch.sum(out_one) + torch.sum(out_two))
-
         loss1 = torch.sum(part_one)
         loss2 = torch.sum(part_two)
         loss: torch.Tensor = -(loss1 + loss2)
-        
-        if reg_loss is not None:
-            print(loss, reg_loss)
+        cri = loss.data
+
+        if reg_loss is not None and wait==False:
             loss = loss + reg_loss
-            print('reg+loss', loss)
-            
-        
+
         if torch.isnan(loss) or torch.isinf(loss):
             print('part_one:', part_one)
             print('part_two:', part_two)
             print("loss1:", loss1)
             print("loss2:", loss2)
             raise ValueError("nan or inf")
-        cri = out_loss.item()
 
         if wait:
             loss.backward()
@@ -246,6 +248,66 @@ class ELBO:
             self.optForvar.zero_grad()
 
         return cri
+
+    def stageOneGam(self, rating, xij):
+        rating: torch.FloatTensor
+        gamma: torch.FloatTensor
+        xij: torch.LongTensor
+
+
+
+        part_one = self.cross(xij, rating)
+        loss: torch.FloatTensor = -torch.sum(part_one)
+
+        cri = loss.data
+        self.optFortheta.zero_grad()
+        loss.backward()
+        self.optFortheta.step()
+        return cri
+
+    def stageTwoUni(self, rating, gamma, xij, reg_loss=None):
+        rating: torch.FloatTensor
+        gamma: torch.FloatTensor
+        xij: torch.LongTensor
+
+        gamma = gamma + self.eps
+
+        eta = xij * 1.0 + (1 - xij) * self.exprior
+        # print('eta', eta)
+        same_term = log((1 - eta + self.eps) / (1 - gamma + 2 * self.eps))
+        part_one = xij * log((rating + self.eps) / self.epsilon) \
+                   + (1 - xij) * log((1 - rating + self.eps) / (1 - self.epsilon)) \
+                   + log(eta / gamma) \
+                   - same_term
+
+        part_two = (self.cross(xij, self.epsilon) + same_term)
+
+        part_one = part_one * gamma
+        part_two = part_two
+
+        loss1 = torch.sum(part_one)
+        loss2 = torch.sum(part_two)
+        loss: torch.Tensor = -(loss1 + loss2)
+        cri = loss.data
+
+        if reg_loss is not None:
+            print('loss regloss', loss, reg_loss)
+            loss = loss + reg_loss
+            print('reg+loss', loss)
+
+        if torch.isnan(loss) or torch.isinf(loss):
+            print('part_one:', part_one)
+            print('part_two:', part_two)
+            print("loss1:", loss1)
+            print("loss2:", loss2)
+            raise ValueError("nan or inf")
+
+        self.optForvar.zero_grad()
+        loss.backward()
+        self.optForvar.step()
+
+        return cri
+
 
     @staticmethod
     def cross(a, b):
@@ -264,14 +326,8 @@ def getAllData(dataset, gamma=None):
     return:
         [u, i, x_ui]
     """
-    # if gamma is not None:
-    #     print(gamma.size())
     dataset: BasicDataset
-    users = []
-    items = []
-    xijs = None
-    allPos = dataset.allPos
-    allxijs = np.array(dataset.UserItemNet.todense()).reshape(-1)
+    allxijs = dataset.UserItemNet.toarray().reshape(-1)
     items = np.tile(np.arange(dataset.m_items), (1, dataset.n_users)).squeeze()
     users = np.tile(np.arange(dataset.n_users), (dataset.m_items, 1)).T.reshape(-1)
     print(len(allxijs), len(items), len(users))
@@ -280,9 +336,8 @@ def getAllData(dataset, gamma=None):
     #     users.extend([user]*dataset.m_items)
     #     items.extend(range(dataset.m_items))
     if gamma is not None:
-        return torch.Tensor(users).long(), torch.Tensor(items).long(), torch.from_numpy(allxijs).long(), gamma.reshape(
-            -1)
-    return torch.Tensor(users).long(), torch.Tensor(items).long(), torch.from_numpy(allxijs).long()
+        return torch.LongTensor(users), torch.LongTensor(items), torch.LongTensor(allxijs), gamma.reshape(-1)
+    return torch.LongTensor(users), torch.LongTensor(items), torch.LongTensor(allxijs)
 
 # ====================End Samplers=============================
 # =========================================================
@@ -299,7 +354,6 @@ def set_seed(seed):
     torch.manual_seed(seed)
 
 def minibatch(*tensors, **kwargs):
-
     batch_size = kwargs.get('batch_size', world.config['batch_size'])
 
     if len(tensors) == 1:
@@ -312,7 +366,6 @@ def minibatch(*tensors, **kwargs):
 
 
 def shuffle(*arrays, **kwargs):
-
     require_indices = kwargs.get('indices', False)
 
     if len(set(len(x) for x in arrays)) != 1:
@@ -332,6 +385,8 @@ def shuffle(*arrays, **kwargs):
     else:
         return result
 
+
+
 # ====================End Train Tools=============================
 # =========================================================
 
@@ -346,41 +401,19 @@ def recall_precisionATk(test_data, pred_data, k=5):
     k : top-k
     """
     assert len(test_data) == len(pred_data)
-    right_items = 0
-    recall_n = 0
-    precis_n = len(test_data) * k
-    for i in range(len(test_data)):
+    sum_right_items = 0
+    recall = 0
+    test_len = len(test_data)
+    precis_n = test_len * k
+    for i in range(test_len):
         groundTrue = test_data[i]
-        predictTopK = pred_data[i][:k]
+        predictTopK = pred_data[i]
         bingo = list(filter(lambda x: x in groundTrue, predictTopK))
-        right_items += len(bingo)
-        recall_n += len(groundTrue)
-    return {'recall': right_items / recall_n, 'precision': right_items / precis_n}
+        right_items = len(bingo)
+        recall += right_items / len(groundTrue)
+        sum_right_items += right_items
 
-
-def RecallPrecision_ATk(test_data, r, k):
-    right_pred = r[:, :k].sum(1)
-    precis_n = k
-    recall_n = np.array([len(test_data[i]) for i in range(len(test_data))])
-    recall = np.mean(right_pred / recall_n)
-    precis = np.mean(right_pred) / precis_n
-    return {'recall': recall, 'precision': precis}
-
-
-def NDCGatK_r(r, k):
-    pred_data = r[:, :k]
-    idcg = np.sum(1. / np.log2(np.arange(2, k + 2)))
-    dcg = pred_data * (1. / np.log2(np.arange(2, k + 2)))
-    dcg = np.sum(dcg, axis=1)
-    return np.mean(dcg) / idcg
-
-
-def MRRatK_r(r, k):
-    pred_data = r[:, :k]
-    scores = 1. / np.arange(1, k + 1)
-    pred_data = pred_data / scores
-    pred_data = pred_data.sum(1)
-    return np.mean(pred_data)
+    return {'recall': recall / test_len, 'precision': sum_right_items / precis_n}
 
 
 def getLabel(test_data, pred_data):
@@ -394,60 +427,28 @@ def getLabel(test_data, pred_data):
     return np.array(r)
 
 
-def MRRatK(test_data, pred_data, k):
-    """
-    Mean Reciprocal Rank
-    """
-    MRR_n = len(test_data)
-    scores = 0.
-    for i in range(len(test_data)):
-        groundTrue = test_data[i]
-        prediction = pred_data[i]
-        for j, item in enumerate(prediction):
-            if j >= k:
-                break
-            if item in groundTrue:
-                scores += 1 / (j + 1)
-                break
-
-    return scores / MRR_n
-
-
-def NDCGatK(test_data, pred_data, k):
+def NDCGatALL(test_data, pred_data):
     """
     Normalized Discounted Cumulative Gain
     rel_i = 1 or 0, so 2^{rel_i} - 1 = 1 or 0
     NOTE implementation is slooooow
     """
-    pred_rel = []
-    idcg = []
-    for i in range(len(test_data)):
+
+    ndcg = 0
+    test_len = len(test_data)
+    for i in range(test_len):
         groundTrue = test_data[i]
-        predictTopK = pred_data[i][:k]
-        pred = list(map(lambda x: x in groundTrue, predictTopK))
-        pred = np.array(pred).astype("float")
-        pred_rel.append(pred)
-
-        if len(groundTrue) < k:
-            coeForIdcg = np.log2(np.arange(2, len(groundTrue) + 2))
-        else:
-            coeForIdcg = np.log2(np.arange(2, k + 2))
-
-        idcgi = np.sum(1. / coeForIdcg)
-        idcg.append(idcgi)
-        # print(pred)
-
-    pred_rel = np.array(pred_rel)
-    idcg = np.array(idcg)
-    coefficients = np.log2(np.arange(2, k + 2))
-    # print(coefficients.shape, pred_rel.shape)
-    # print(coefficients)
-    assert len(coefficients) == pred_rel.shape[-1]
-
-    pred_rel = pred_rel / coefficients
-    dcg = np.sum(pred_rel, axis=1)
-    ndcg = dcg / idcg
-    return np.mean(ndcg)
+        predictSort = pred_data[i]
+        pred = list(map(lambda x: x in groundTrue, predictSort))
+        pred = np.array(pred).astype("int")
+        coeFordcg = np.log2(np.arange(2, len(predictSort) + 2))
+        dcgi = np.sum(pred / coeFordcg)
+        coeForIdcg = np.log2(np.arange(2, len(groundTrue) + 2))
+        idcgi = np.sum(1 / coeForIdcg)
+        ndcgi = dcgi / idcgi
+        ndcg += ndcgi
+    ndcg = ndcg / test_len
+    return ndcg
 
 
 # ====================end Metrics=============================

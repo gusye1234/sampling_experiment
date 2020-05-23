@@ -25,8 +25,9 @@ losses = {
 
 samplings = {
   1: 'all_data_nobatch_xij',
-  2: "all_data_xij",
-  3: 'fast_sampling'
+  2: 'fast_sampling',
+  3: 'all_data_xij_grad_accu',
+  4: 'sample_gamuni_xij_no_batch'
 }
 
 
@@ -56,11 +57,11 @@ config['w_weight_decay'] = args.wdecay
 config['lightGCN_n_layers']= args.layer
 config['hyper_x'] = args.hyperx
 config['ex_prior'] = args.exprior
-config['batch_size'] = 2048
 # ===============================
 config['xij_dim'] = 1
+
 # ======================
-TRAIN_epochs = 1001
+TRAIN_epochs = 800
 LOAD = False
 PATH = '../checkpoints'
 top_k = 5
@@ -69,6 +70,7 @@ comment = f"{sample_type}_{rec_type}_{var_type}"
 tensorboard = True
 GPU = torch.cuda.is_available()
 device = torch.device('cuda' if GPU else "cpu")
+print('device', device)
 CORES = multiprocessing.cpu_count() // 2
 multi_cores = False
 ontest = args.ontest

@@ -1,13 +1,13 @@
+#！/usr/local/bin/python
 import world
 import torch
-from torch import nn, optim
 import numpy as np
-from torch import log
+import dataloader
 from dataloader import BasicDataset
 from model import LightGCN_xij_item_personal_matrix
 from time import time
-
-
+import math
+from time import  time
 class SamplePersonal:
     def __init__(self,
                  varmodel:LightGCN_xij_item_personal_matrix,
@@ -19,11 +19,15 @@ class SamplePersonal:
         self.staPosUsers = dataset.posSampleUser
         self.staPosItems = dataset.posSampleItem
         self.numPosUsers = dataset.numPosUsers
+        self.exdim = world.config['latent_dim_var'] + 1
+        self.staPosUsersTensor = dataset.staPosUsersTensor
+        print('self.exdim', self.exdim)
         self.posSamplesNum = len(self.staPosUsers)
         self.n_users = dataset.n_users
         self.m_items = dataset.m_items
         self.__prob = {}
         print("fast sample")
+
 
     def compute(self, epochk):
         with torch.no_grad():
@@ -36,13 +40,14 @@ class SamplePersonal:
             items_emb_pos_1 = items_emb_1[self.staPosItems]
             self.gammaPerPosSample = torch.mul(user_emb_pos, items_emb_pos_1).sum(1)
 
-        Sqk0 = torch.sum(items_emb_0, dim=0)
-        staPosUsersTensor = self.staPosUsers.reshape(-1, 1).expand(-1, 21)
 
-        Sqpik1 = torch.zeros(self.n_users, 21)
-        Sqpik0 = torch.zeros(self.n_users, 21)
-        Sqpik1.scatter_add_(0, staPosUsersTensor, items_emb_pos_1)
-        Sqpik0.scatter_add_(0, staPosUsersTensor, items_emb_pos_0)
+
+        Sqk0 = torch.sum(items_emb_0, dim=0)
+
+        Sqpik1 = torch.zeros(self.n_users, self.exdim)
+        Sqpik0 = torch.zeros(self.n_users, self.exdim)
+        Sqpik1.scatter_add_(0, self.staPosUsersTensor, items_emb_pos_1)
+        Sqpik0.scatter_add_(0, self.staPosUsersTensor, items_emb_pos_0)
 
 
         Spi0 = torch.matmul(Sqk0, user_emb.t())
@@ -72,22 +77,23 @@ class SamplePersonal:
         self.numPerUserNegTruth = self.round(numPerUserNeg * self.__prob['neg0/negtrue'])
         self.numPerUserSample = self.numPerUserPos + self.numPerUserNegTruth
 
-        return Sp
+
 
     def sample(self, epochk):
         print('sample start!')
-        G = self.compute(epochk)
+        self.compute(epochk)
 
         Samusers = None
         Samitems = None
         Samxijs = None
+
         self.countPos = 0
         self.countNeg = 0
         candi_neg_items = torch.multinomial(self.__prob['p(j|k)neg'], epochk, replacement=True)
         all_sample_times = self.numPerUserSample
+
         for user_id, sample_times in enumerate(all_sample_times):
             if sample_times == 0:
-                
                 continue
             items, xijs = self.sampleForUser(user_id, candi_neg_items)
             users = torch.tensor([user_id] * len(items)).long()
@@ -101,7 +107,8 @@ class SamplePersonal:
                 Samxijs = torch.cat([Samxijs, xijs])
 
         self.__prob.clear()
-        return Samusers, Samitems, Samxijs, G.item()
+
+        return Samusers, Samitems, Samxijs
 
     def sampleForUser(self, user, candi_neg_items):
         posi = self.numPerUserPos[user]
@@ -110,7 +117,7 @@ class SamplePersonal:
         if posi == 0:
             posItems = None
         else:
-            xijs1 = torch.tensor([1] * posi.item())
+            xijs1 = torch.LongTensor([1] * posi.item())
 
             posGammaForUser = self.gammaPerPosSample[self.countPos:  self.countPos+posPerUserNum]
             posIndex = torch.multinomial(posGammaForUser, posi, replacement=True)
@@ -125,28 +132,40 @@ class SamplePersonal:
         negItems = candi_neg_items[dims, self.countNeg:self.countNeg+negi]
         self.countNeg = self.countNeg+negi
         negItems = np.array(torch.diag(negItems))
-
         userindex = np.array([user]*len(negItems))
         xij = 1 - self.dataset.getUserItemFeedback(userindex, negItems)
-
         negitruth = xij.sum()
         negItemsTruthIndex = np.where(xij)
-        negItems = torch.tensor(negItems[negItemsTruthIndex])
-
-        xijs0 = torch.tensor([0] * negitruth)
+        negItems = torch.from_numpy(negItems[negItemsTruthIndex])
+        xijs0 = torch.LongTensor([0] * negitruth)
         if posItems is None:
-            return negItems.long(), xijs0
-        return torch.cat([posItems.long(), negItems.long()]), torch.cat([xijs1, xijs0])
-
-
-
+            return negItems, xijs0
+        return torch.cat([posItems, negItems]), torch.cat([xijs1, xijs0])
 
 
     @staticmethod
     def round(tensor):
-        tensor_base = tensor.int()
+        tensor_base = tensor.long()
         AddonePros = tensor - tensor_base
         AddONE = torch.bernoulli(AddonePros)
-        return (tensor_base + AddONE).int()
+        return (tensor_base + AddONE).long()
+
+
+class sampleUniForVar():
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.n_users = world.config['num_users']
+        self.m_items = world.config['num_items']
+        self.trainDataSize = world.config['trainDataSize']
+        self.numItemsForUser = math.ceil(self.trainDataSize / self.n_users )
+        users = np.arange(0, self.n_users)
+        self.userRepeat = users.repeat(self.numItemsForUser)
+        self.numItems = self.userRepeat.shape[0]
+             
+    def sample(self):
+        items = np.random.choice(self.m_items, self.numItems, replace=True)
+        xij = self.dataset.getUserItemFeedback(self.userRepeat, items)
+        return torch.LongTensor(self.userRepeat), torch.LongTensor(items), torch.LongTensor(xij)
         
-        
+
+

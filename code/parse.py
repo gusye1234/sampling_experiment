@@ -39,7 +39,7 @@ def parse_args():
                         help="enable tensorboard")
     parser.add_argument('--comment', type=str,default="lgn")
     parser.add_argument('--load', type=bool,default=False)
-    parser.add_argument('--sampletype', type=int, default=2,
+    parser.add_argument('--sampletype', type=int, default=4,
                         help="sampling methods types")
     parser.add_argument('--seed', type=int, default=2020,
                         help="random seed")

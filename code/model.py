@@ -34,7 +34,7 @@ class RecMF(nn.Module):
         with torch.no_grad():
             users_emb = self.embedding_user(users.long())
             items_emb = self.embedding_item.weight
-            rating = self.f(torch.matmul(users_emb, items_emb.t()))
+            rating = self.f(torch.mm(users_emb, items_emb.t()))
             return rating
 
     
@@ -84,8 +84,9 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
 
         self.w_user = torch.nn.Linear(self.latent_dim, self.latent_dim, bias=False)
         self.w_item = torch.nn.Linear(self.latent_dim, self.latent_dim, bias=False)
-        nn.init.uniform_(self.w_user.weight, a=-1, b=1)
-        nn.init.uniform_(self.w_item.weight, a=-1, b=1)
+        eye = torch.eye(self.latent_dim, self.latent_dim)
+        self.w_user.weight.data.copy_(eye)
+        self.w_item.weight.data.copy_(eye)
 
         self.n_layers = self.config['lightGCN_n_layers']
         self.keep_prob = self.config['keep_prob']
@@ -103,7 +104,7 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
             all_users, all_items = self.computer()
 
             hyper_x = self.hyper_x
-            xij_user_emb = torch.tensor([hyper_x] * self.num_users).reshape(-1, 1).to(world.device)
+            xij_user_emb = torch.FloatTensor([hyper_x] * self.num_users).reshape(-1, 1).to(world.device)
 
             xij_item_emb0 = self.embedding_item_xij0.weight
             xij_item_emb1 = self.embedding_item_xij1.weight
@@ -114,6 +115,7 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
             users_emb = torch.cat([(1 - hyper_x) * self.soft(users_emb), xij_user_emb], dim=1)
             items_emb0 = self.sig(torch.cat([items_emb, xij_item_emb0], dim=1))
             items_emb1 = self.sig(torch.cat([items_emb, xij_item_emb1], dim=1))
+
             return users_emb, items_emb0, items_emb1
 
     def __dropout(self, keep_prob):
@@ -159,23 +161,23 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
         """
 
         with torch.no_grad():
-
             all_users, all_items = self.computer()
-            users_emb = all_users[users.long()]
+
+            users_emb = self.w_user(all_users)
+            users_emb = users_emb[users.long()]
 
             hyper_x = self.hyper_x
-            xij_user_emb = torch.tensor([hyper_x] * len(users)).reshape(-1, 1).to(world.device)
-            users_emb = self.w_user(users_emb)
-
+            xij_user_emb = torch.FloatTensor([hyper_x] * len(users)).reshape(-1, 1).to(world.device)
             users_emb = torch.cat([(1 - hyper_x) * self.soft(users_emb), xij_user_emb], dim=1)
-            xij_item_emb = self.embedding_item_xij0.weight
-            all_items = self.w_item(all_items)
-            all_items = self.sig(torch.cat([all_items, xij_item_emb], dim=1))
 
-            gamma = torch.matmul(users_emb, all_items.t())
+            xij_item_emb = self.embedding_item_xij0.weight
+            items_emb = self.w_item(all_items)
+            items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
+
+            gamma = torch.matmul(users_emb, items_emb.t())
             return gamma
 
-    def forwardWithReg(self, users, items, xij, G, S):
+    def forwardWithReg(self, users, items, xij):
         gamma = self.forward(users, items, xij)
         userEmb_ego = self.embedding_user.weight
         itemEmb_ego = self.embedding_item.weight
@@ -196,33 +198,54 @@ class LightGCN_xij_item_personal_matrix(nn.Module):
 
 
         reg_loss = reg_loss_emb + reg_loss_w
-        print('reg_loss_emb, reg_loss_x', reg_loss_emb, reg_loss_w)
-        #print('S, G', S, G, S/G)
-        #reg_loss = S / G * reg_loss
+        #print('reg_loss_emb, reg_loss_w', reg_loss_emb, reg_loss_w)
 
         return gamma, reg_loss
 
+    def reg_loss(self):
+        userEmb_ego = self.embedding_user.weight
+        itemEmb_ego = self.embedding_item.weight
+
+        xij_item_emb0 = self.embedding_item_xij0.weight
+        xij_item_emb1 = self.embedding_item_xij1.weight
+
+        w_user_ego = self.w_user.weight
+        w_item_ego = self.w_item.weight
+
+        reg_loss_emb = (1 / 2) * self.emb_decay * (torch.sum(userEmb_ego ** 2)
+                                                   + torch.sum(itemEmb_ego ** 2)
+                                                   + torch.sum(xij_item_emb0 ** 2)
+                                                   + torch.sum(xij_item_emb1 ** 2))
+
+        reg_loss_w = (1 / 2) * self.wdecay * (torch.sum(w_user_ego ** 2)
+                                              + torch.sum(w_item_ego ** 2))
+
+        reg_loss = reg_loss_emb + reg_loss_w
+        # print('reg_loss_emb, reg_loss_w', reg_loss_emb, reg_loss_w)
+
+        return reg_loss
+
     def forward(self, users, items, xij):
         all_users, all_items = self.computer()
-        users_emb = all_users[users.long()]
-        items_emb = all_items[items.long()]
+
+        users_emb = self.w_user(all_users)
+        items_emb = self.w_item(all_items)
+        users_emb = users_emb[users.long()]
+        items_emb = items_emb[items.long()]
 
         hyper_x = self.hyper_x
-        xij_user_emb = torch.tensor([hyper_x] * len(users)).reshape(-1, 1).to(world.device)
+        xij_user_emb = torch.FloatTensor([hyper_x] * len(users)).reshape(-1, 1).to(world.device)
 
         xij_item_emb = torch.zeros(len(xij), self.xij_dim).to(world.device)
         xij_item_emb[xij.bool()] = self.embedding_item_xij1(items[xij.bool()].long())
         xij_item_emb[~xij.bool()] = self.embedding_item_xij0(items[~xij.bool()].long())
 
-        users_emb = self.w_user(users_emb)
-        items_emb = self.w_item(items_emb)
-
 
         users_emb = torch.cat([(1 - hyper_x) * self.soft(users_emb), xij_user_emb], dim=1)
         items_emb = self.sig(torch.cat([items_emb, xij_item_emb], dim=1))
 
-
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
         return gamma
+
 
