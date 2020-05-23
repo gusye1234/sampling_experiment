@@ -62,7 +62,7 @@ def all_data_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch
 def sample_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, w=None, **args):
     flag = f"sample_xij_nobatch_[{world.rec_type}-{world.var_type}]"
     print(flag)
-    sampler = args['sampler']
+    sampler = args['sampler1']
     Recmodel = recommend_model
     Varmodel = var_model
     loss_class: utils.ELBO
@@ -81,14 +81,14 @@ def sample_xij_no_batch(dataset, recommend_model, var_model, loss_class, epoch, 
     gam1=epoch_gamma.data
     loss1 = loss_class.stageOne(rating, epoch_xij, gam1, pij=gam1)
 
-    rating = Recmodel(epoch_users, epoch_items).data
+    rating2 = Recmodel(epoch_users, epoch_items).data
     if lgn:
         print('lgn reg')
         # batch_gamma = Varmodel(batch_users, batch_items, batch_xij)
-        loss2 = loss_class.stageTwoPrior(rating, epoch_gamma, epoch_xij, pij=gam1, reg_loss=reg_loss)
+        loss2 = loss_class.stageTwoPrior(rating2, epoch_gamma, epoch_xij, pij=gam1, reg_loss=reg_loss)
     else:
         print('mf reg')
-        loss2 = loss_class.stageTwoPrior(rating, epoch_gamma, epoch_xij, pij=gam1, reg_loss=reg_loss)
+        loss2 = loss_class.stageTwoPrior(rating2, epoch_gamma, epoch_xij, pij=gam1, reg_loss=reg_loss)
 
     
 

@@ -179,11 +179,11 @@ class Ciao(BasicDataset):
     LastFM dataset
     """
 
-    def __init__(self, path="../data/ciao/"):
+    def __init__(self, path="../data/lastfm/"):
         # train or test
         self.n_users = 5298
         self.m_items = 19301
-        # load txt int32
+        # load txt long
         if world.ontest:
             trainData = np.loadtxt(join(path, 'data1.txt'))
             print("training data:", join(path, 'data1.txt'))
@@ -198,8 +198,10 @@ class Ciao(BasicDataset):
             print("testing data:", join(path, 'validation.txt'))
         trainData = (trainData - 1).astype(np.long)
         testData = (testData - 1).astype(np.long)
+        self.trainData = trainData
+        self.testData = testData
         self.trainUser = trainData[:, 0]
-        self.trainUniqueUsers = np.unique(self.trainUser)
+        # self.trainUniqueUsers = np.unique(self.trainUser)
         self.trainItem = trainData[:, 1]
 
         self.trainDataSize = len(self.trainUser)
@@ -226,6 +228,7 @@ class Ciao(BasicDataset):
         self.groundTruth = list(testDict[user] for user in self.testUniqueUsers)
         # for sample
         self.posSampleUser, self.posSampleItem, self.numPosUsers = self.getAllUserPosItems()
+        self.staPosUsersTensor = self.posSampleUser.reshape(-1, 1).expand(-1, world.config['latent_dim_var'] + 1)
         self.Graph = self.getSparseGraph()
 
     def getSparseGraph(self):
@@ -250,6 +253,7 @@ class Ciao(BasicDataset):
         """
         return:
             dict: {user: [items]}
+            int32
         """
         test_data = {}
         for i, item in enumerate(self.testItem):

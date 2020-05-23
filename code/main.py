@@ -71,8 +71,15 @@ if globals().get('Varmodel'):
     Varmodel = Varmodel.to(world.device)
 
 
+rdecay = world.config['rec_weight_decay']
+varlr = world.config['var_lr']
+vdecay = world.config['var_weight_decay']
+wdecay = world.config['w_weight_decay']
+rlr = world.config['rec_lr']
+
+
 if world.tensorboard:
-    w : SummaryWriter = SummaryWriter("/output/"+ "runs/"+time.strftime("%m-%d-%Hh%Mm%Ss-") + "-" + world.comment)
+    w: SummaryWriter = SummaryWriter("../output/" + "runs/" + time.strftime("%m%d-%Hh") + str(rlr) + str(rdecay) + str(varlr) + str(vdecay) + str(wdecay) + "-" + world.comment)
 else:
     w = None
     
@@ -93,6 +100,18 @@ try:
             print('[TEST]')
             TrainProcedure.Test(dataset, Recmodel, Varmodel, world.top_k, i, w)
         print("total time:", time.time() - start)
+
+    with torch.no_grad():
+        print('save_gamma_xij_embedding')
+
+        users_embedding, items_embedding0, items_embedding1 = Varmodel.get_user_item_embedding()
+        np.savetxt(f'../users_embedding{rlr}{rdecay}{varlr}{vdecay}{wdecay}.txt',
+                   users_embedding.cpu().detach().numpy())
+        np.savetxt(f'../items_embedding0{rlr}{rdecay}{varlr}{vdecay}{wdecay}.txt',
+                   items_embedding0.cpu().detach().numpy())
+        np.savetxt(f'../items_embedding1{rlr}{rdecay}{varlr}{vdecay}{wdecay}.txt',
+                   items_embedding1.cpu().detach().numpy())
+        print('save_ok')
 
 
 
