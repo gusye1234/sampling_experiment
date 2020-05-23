@@ -271,7 +271,7 @@ class ELBO:
         xij: torch.LongTensor
 
         gamma = gamma + self.eps
-
+        rating = rating.detach()
         eta = xij * 1.0 + (1 - xij) * self.exprior
         # print('eta', eta)
         same_term = log((1 - eta + self.eps) / (1 - gamma + 2 * self.eps))
